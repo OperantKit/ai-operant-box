@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-operant-box"
+version = "0.1.0a0"
+description = "LLM-as-subject simulator: an LLM agent acts as a participant in a three-term-contingency operant chamber per OperantKit DSL."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "operantkit contributors" }]
+dependencies = [
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+llm = [
+    "anthropic>=0.39",
+]
+test = [
+    "pytest>=8",
+    "pytest-cov",
+    "pytest-asyncio>=0.23",
+]
+dev = [
+    "pytest>=8",
+    "pytest-cov",
+    "pytest-asyncio>=0.23",
+    "mypy>=1.10",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+ai-operant-box = "ai_operant_box.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_operant_box"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"
+markers = [
+    "unit: pure-function unit tests",
+    "integration: end-to-end / multi-component tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict_optional = true
+warn_unused_ignores = true
+ignore_missing_imports = true
