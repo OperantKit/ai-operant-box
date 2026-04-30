@@ -18,21 +18,47 @@ dependencies = [
 llm = [
     "anthropic>=0.39",
 ]
+# Cumulative-record rendering delegates to session-analyzer for canonical
+# Ferster & Skinner style (Lattal, 2004). Declared as a local path
+# reference so monorepo checkouts can resolve it without a PyPI release.
+viz = [
+    "session-analyzer @ {root:uri}/../../analysis/session-analyzer",
+    "matplotlib>=3.7",
+]
+# Canonical OperantKit pipeline: experiment-core / session-recorder for
+# OKL v1 mirror of native BehavioralEvent stream
+# (see ai_operant_box.async_simulator.canonical_sink).
+canonical = [
+    "experiment-core @ {root:uri}/../../experiment/experiment-core",
+    "session-recorder @ {root:uri}/../../experiment/session-recorder",
+]
 test = [
     "pytest>=8",
     "pytest-cov",
     "pytest-asyncio>=0.23",
+    "session-analyzer @ {root:uri}/../../analysis/session-analyzer",
+    "matplotlib>=3.7",
+    "experiment-core @ {root:uri}/../../experiment/experiment-core",
+    "session-recorder @ {root:uri}/../../experiment/session-recorder",
 ]
 dev = [
     "pytest>=8",
     "pytest-cov",
     "pytest-asyncio>=0.23",
+    "session-analyzer @ {root:uri}/../../analysis/session-analyzer",
+    "matplotlib>=3.7",
+    "experiment-core @ {root:uri}/../../experiment/experiment-core",
+    "session-recorder @ {root:uri}/../../experiment/session-recorder",
     "mypy>=1.10",
     "ruff>=0.5",
 ]
 
 [project.scripts]
 ai-operant-box = "ai_operant_box.cli:main"
+
+[tool.hatch.metadata]
+# Required to accept PEP 508 direct references (file://) in dependencies.
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_operant_box"]

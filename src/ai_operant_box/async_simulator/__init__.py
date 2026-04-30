@@ -9,6 +9,7 @@ The discrete-time SD-R-SR API in :mod:`ai_operant_box.chamber` and
 :mod:`ai_operant_box.agent` is the recommended entry point for new code.
 """
 
+from ai_operant_box.async_simulator.canonical_sink import mirror_events_to_sink
 from ai_operant_box.async_simulator.core import (
     LLMSubject as AsyncLLMSubject,
 )
@@ -35,5 +36,6 @@ __all__ = [
     "ScheduleManager",
     "Session",
     "Stimulus",
+    "mirror_events_to_sink",
     "run_operant_session",
 ]
