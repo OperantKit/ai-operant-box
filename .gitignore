@@ -18,3 +18,7 @@ coverage.xml
 tmp/
 *.jsonl
 !tests/**/*.jsonl
+.venv-fresh/
+*.py[cod]
+htmlcov/
+PLAN.md
