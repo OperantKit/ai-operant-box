@@ -1,5 +1,7 @@
 # ai-operant-box
 
+:jp: [日本語版 README](README.ja.md)
+
 LLM-as-subject simulator. A large language model acts as a virtual organism
 inside an operant chamber, sensing a discriminative stimulus (SD), emitting a
 response (R), and receiving a consequence (SR) on every trial — the three-term
