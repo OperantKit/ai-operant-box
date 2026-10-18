@@ -52,6 +52,56 @@ To enable the LLM-backed subject:
 export ANTHROPIC_API_KEY="..."
 ```
 
+## 30-second example
+
+Put a numerical subject whose response probability grows with the square of the time since the last reinforcer (`P(R) = min(1, k * t**2)`) on a fixed-interval 30-s schedule for 600 one-second steps. No LLM and no API key are needed:
+
+```python
+import random
+
+from ai_operant_box.agent.scallop_agent import ScallopingAgent
+from ai_operant_box.chamber.environment import OperantBox
+from ai_operant_box.chamber.schedule import FixedInterval
+
+random.seed(42)  # ScallopingAgent draws from the module-level RNG
+agent = ScallopingAgent(k=0.005)
+box = OperantBox(subject=agent, schedule=FixedInterval(30.0))
+
+for _ in range(600):  # 600 one-second steps of FI 30 s
+    agent.update_time(1.0)
+    box.step(1.0)
+
+responses = len(box.records)
+reinforcers = sum(r.is_reinforced for r in box.records)
+print(f"responses={responses} reinforcers={reinforcers}")
+# responses=422 reinforcers=20
+
+# Responses in each tenth of the 30-s interval, pooled over the session
+bins = [0] * 10
+last_sr = 0.0
+for r in box.records:
+    bins[min(9, int((r.timestamp - last_sr) / 3.0))] += 1
+    if r.is_reinforced:
+        last_sr = r.timestamp
+print(bins)
+# [1, 5, 12, 30, 54, 60, 60, 60, 60, 80]
+```
+
+Responding is rare early in each interval and rises toward the end (the FI scallop); the last tenth also holds the reinforced response of each interval. The clock is simulated, so the run takes well under a second and prints the same numbers every time.
+
+To put a language model in the same chamber, install the `llm` extra and use `ai_operant_box.agent.llm_agent.LLMSubject`. To keep the events as an OKL v1 log, install the `canonical` extra and pass them through `ai_operant_box.async_simulator.canonical_sink.mirror_events_to_sink` to a [session-recorder](https://github.com/OperantKit/session-recorder) sink.
+
+## Why not a 50-line hand-written chamber?
+
+A short loop that asks a model "press or not" and counts presses leaves out what makes the result comparable with animal data:
+
+- **The three-term contingency as an interface.** Every subject implements `sense(SD)`, `act() -> R`, and `learn(SR)` (`ai_operant_box.agent.base.Subject`), so a numerical agent and an LLM run in the same chamber and the same schedule.
+- **A simulated clock.** `VirtualClock` advances by the step size, so interval schedules are timed in session time, not in wall-clock time spent waiting for an API.
+- **Variable schedules from the Fleshler-Hoffman (1962) progression.** VI and VR values come from the Fleshler-Hoffman exponential approximation; RI and RR are provided separately.
+- **A dyadic interdependent schedule.** `LeaderFollowerBox` delivers a reinforcer to both subjects when the follower responds within a window after the leader's response, and reports response rates, reinforcement rate, mean IRT, and a synchrony ratio.
+- **The FI scallop model.** `ai_operant_box.analytics.model_fit.ModelFitAnalyzer` fits `P(R | t) = min(1, k * t**2)` to binned response probabilities.
+- **In-context learning history for an LLM subject.** `LLMSubject` sends each earlier stimulus, response, and consequence back to the model as conversation turns.
+
 ## Run tests
 
 ```bash

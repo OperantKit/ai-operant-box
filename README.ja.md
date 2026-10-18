@@ -53,6 +53,56 @@ LLM バックエンドの被験体を有効化するには:
 export ANTHROPIC_API_KEY="..."
 ```
 
+## 30 秒で動く例
+
+直前の強化子からの経過時間の 2 乗に比例して反応確率が上がる数値被験体（`P(R) = min(1, k * t**2)`）を、FI 30 秒のもとで 1 秒刻み 600 ステップ走らせる。LLM も API キーも要らない:
+
+```python
+import random
+
+from ai_operant_box.agent.scallop_agent import ScallopingAgent
+from ai_operant_box.chamber.environment import OperantBox
+from ai_operant_box.chamber.schedule import FixedInterval
+
+random.seed(42)  # ScallopingAgent はモジュール共通の乱数を使う
+agent = ScallopingAgent(k=0.005)
+box = OperantBox(subject=agent, schedule=FixedInterval(30.0))
+
+for _ in range(600):  # FI 30 秒を 1 秒刻みで 600 ステップ
+    agent.update_time(1.0)
+    box.step(1.0)
+
+responses = len(box.records)
+reinforcers = sum(r.is_reinforced for r in box.records)
+print(f"responses={responses} reinforcers={reinforcers}")
+# responses=422 reinforcers=20
+
+# 30 秒の間隔を 10 等分した各区間の反応数（セッション全体で合算）
+bins = [0] * 10
+last_sr = 0.0
+for r in box.records:
+    bins[min(9, int((r.timestamp - last_sr) / 3.0))] += 1
+    if r.is_reinforced:
+        last_sr = r.timestamp
+print(bins)
+# [1, 5, 12, 30, 54, 60, 60, 60, 60, 80]
+```
+
+各間隔の前半では反応がまれで、終わりに向かって増える（FI スキャロップ）。最後の区間には各間隔の強化された反応も入る。時計は模擬なので 1 秒もかからずに終わり、毎回同じ数値を出す。
+
+同じチャンバーに言語モデルを入れるには `llm` extra を入れて `ai_operant_box.agent.llm_agent.LLMSubject` を使う。事象を OKL v1 のログとして残すには `canonical` extra を入れ、`ai_operant_box.async_simulator.canonical_sink.mirror_events_to_sink` で [session-recorder](https://github.com/OperantKit/session-recorder) の sink に渡す。
+
+## 自作の 50 行のチャンバーでは足りない理由
+
+モデルに「押すか押さないか」を尋ねて押した回数を数える短いループには、結果を動物のデータと比べられるようにする部分が欠けている:
+
+- **三項随伴性をそのまま I/F にしている。** 被験体はすべて `sense(SD)`・`act() -> R`・`learn(SR)` を実装する（`ai_operant_box.agent.base.Subject`）。数値エージェントと LLM が同じチャンバー・同じスケジュールで走る。
+- **模擬時計。** `VirtualClock` はステップ幅だけ進むので、間隔スケジュールは API の応答待ちの実時間ではなくセッション時間で計られる。
+- **Fleshler-Hoffman (1962) の数列による変動スケジュール。** VI と VR の値は Fleshler-Hoffman の指数近似から作る。RI と RR は別に用意している。
+- **二者の相互依存スケジュール。** `LeaderFollowerBox` は、先導者の反応の後の窓の中で追従者が反応したとき両者に強化子を渡し、反応率・強化率・平均 IRT・同期率を返す。
+- **FI スキャロップのモデル。** `ai_operant_box.analytics.model_fit.ModelFitAnalyzer` は区間ごとの反応確率に `P(R | t) = min(1, k * t**2)` を当てはめる。
+- **LLM 被験体の文脈内の学習履歴。** `LLMSubject` はそれまでの刺激・反応・結果を会話のターンとしてモデルに送り返す。
+
 ## テスト実行
 
 ```bash

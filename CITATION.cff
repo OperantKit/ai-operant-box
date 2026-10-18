@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ai-operant-box"
+abstract: "LLM-as-subject simulator: an LLM or a numerical agent is the organism in a discrete-time three-term-contingency (SD-R-SR) operant chamber."
+authors:
+  - name: "OperantKit contributors"
+type: software
+license: MIT
+repository-code: "https://github.com/OperantKit/ai-operant-box"
+url: "https://github.com/OperantKit"
+keywords:
+  - behavior-analysis
+  - operant-conditioning
+  - reinforcement-schedule
+  - llm
+  - simulation
