@@ -45,7 +45,7 @@ point pip at it:
 .venv/bin/python -m pip install --find-links <wheel-dir> -e ".[dev]"
 ```
 
-To enable the LLM-backed subject:
+A real LLM subject needs no extra when it runs through the `claude` command (see "A real LLM subject without an API key"). To use the Anthropic API instead:
 
 ```bash
 .venv/bin/python -m pip install -e ".[dev,llm]"
@@ -89,7 +89,42 @@ print(bins)
 
 Responding is rare early in each interval and rises toward the end (the FI scallop); the last tenth also holds the reinforced response of each interval. The clock is simulated, so the run takes well under a second and prints the same numbers every time.
 
-To put a language model in the same chamber, install the `llm` extra and use `ai_operant_box.agent.llm_agent.LLMSubject`. To keep the events as an OKL v1 log, install the `canonical` extra and pass them through `ai_operant_box.async_simulator.canonical_sink.mirror_events_to_sink` to a [session-recorder](https://github.com/OperantKit/session-recorder) sink.
+To put a language model in the same chamber without an API key, see the next section; with an API key, install the `llm` extra and use `ai_operant_box.agent.llm_agent.LLMSubject` with `AnthropicClient`. To keep the events as an OKL v1 log, install the `canonical` extra and pass them through `ai_operant_box.async_simulator.canonical_sink.mirror_events_to_sink` to a [session-recorder](https://github.com/OperantKit/session-recorder) sink.
+
+## A real LLM subject without an API key
+
+`ClaudeCLIClient` runs the `claude` command (Claude Code) as one resident process and sends each step as one user turn, so the process's conversation is the subject's in-context history. It runs on the logged-in Claude subscription; no API key and no extra are needed, only the `claude` command on `PATH` (log in once by running `claude`). `StreamingLLMSubject` sends only the newest step (`Result: Reward` / `Stimulus: Light ON`), reads the action from the reply, and emits a reply that names no single action as `Nothing` (counted in `invalid_count`; the raw reply stays in `history`).
+
+```python
+from ai_operant_box.agent.api_client import ClaudeCLIClient
+from ai_operant_box.agent.llm_agent import SYSTEM_PROMPT, StreamingLLMSubject
+from ai_operant_box.chamber.environment import OperantBox
+from ai_operant_box.chamber.schedule import ContinuousReinforcement
+
+with ClaudeCLIClient(model="haiku", system_prompt=SYSTEM_PROMPT) as client:
+    subject = StreamingLLMSubject(client)
+    box = OperantBox(subject=subject, schedule=ContinuousReinforcement())
+    for _ in range(20):
+        box.step(1.0)
+print(len(box.records), subject.invalid_count, client.latencies[-1])
+```
+
+`examples/claude_cli_crf.py` runs the same session from the command line and writes a cumulative record (PNG, `viz` extra) and a JSON summary with per-step round-trip times.
+
+The system prompt replaces the default Claude Code prompt (`--system-prompt`). With `--append-system-prompt` the coding-assistant prompt stays, and a small model declines the role. Tools, MCP servers, settings files and their hooks, and session persistence are switched off, and the process runs in an empty temporary directory, so no project `CLAUDE.md` reaches the subject. The CLI still adds a one-line identity sentence before the system prompt and short notes with the working directory, the model name, and the date; these are the same in every session.
+
+Measured round-trip time per step on CRF (one machine, October 2026):
+
+| Model alias | Steps | Mean s / step | First step s |
+|---|---|---|---|
+| `haiku` | 20 | 1.1 to 1.4 | about 4 |
+| `haiku` | 150 | 0.8 to 1.1 | about 3 to 4 |
+| `sonnet` | 20 | 1.9 | about 2.5 |
+| `opus` | 20 | 2.6 | about 3.9 |
+
+The per-step time did not grow over 150 steps with `haiku`. Budget about 1.4 s per step for `haiku`, 2.5 s for `sonnet`, and 3.5 s for `opus`: a 600-step `haiku` session takes about 14 minutes. The `haiku` alias resolved to `claude-haiku-4-5-20251001` at the time of measurement; the CLI decides what each alias means.
+
+**Usage limits.** The calls count against the subscription's usage limits, not an API bill. `client.last_result["total_cost_usd"]` is the conversation's API-equivalent price, a proxy for that usage: 150 `haiku` steps came to about 0.24 USD-equivalent, and the reported seven-day utilisation (`client.rate_limit_info`) did not move at its two-decimal resolution across several hundred `haiku` steps. `sonnet` and `opus` use the limits faster per step. `ClaudeCLIClient.generate()` keeps the stateless `generate(model, system, messages)` interface of `LLMSubject`, but it starts a new process and re-sends the whole history every step, so it is slower and is not the default.
 
 ## Why not a 50-line hand-written chamber?
 

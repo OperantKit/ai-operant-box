@@ -46,7 +46,7 @@ python -m venv .venv
 .venv/bin/python -m pip install --find-links <wheel-dir> -e ".[dev]"
 ```
 
-LLM バックエンドの被験体を有効化するには:
+`claude` コマンド経由で本物の LLM を被験体にする場合は extra は要らない（「API キーなしで本物の LLM を被験体にする」を参照）。代わりに Anthropic API を使うには:
 
 ```bash
 .venv/bin/python -m pip install -e ".[dev,llm]"
@@ -90,7 +90,42 @@ print(bins)
 
 各間隔の前半では反応がまれで、終わりに向かって増える（FI スキャロップ）。最後の区間には各間隔の強化された反応も入る。時計は模擬なので 1 秒もかからずに終わり、毎回同じ数値を出す。
 
-同じチャンバーに言語モデルを入れるには `llm` extra を入れて `ai_operant_box.agent.llm_agent.LLMSubject` を使う。事象を OKL v1 のログとして残すには `canonical` extra を入れ、`ai_operant_box.async_simulator.canonical_sink.mirror_events_to_sink` で [session-recorder](https://github.com/OperantKit/session-recorder) の sink に渡す。
+API キーなしで同じチャンバーに言語モデルを入れるには次の節を参照。API キーを使う場合は `llm` extra を入れ、`ai_operant_box.agent.llm_agent.LLMSubject` を `AnthropicClient` と組み合わせる。事象を OKL v1 のログとして残すには `canonical` extra を入れ、`ai_operant_box.async_simulator.canonical_sink.mirror_events_to_sink` で [session-recorder](https://github.com/OperantKit/session-recorder) の sink に渡す。
+
+## API キーなしで本物の LLM を被験体にする
+
+`ClaudeCLIClient` は `claude` コマンド（Claude Code）を 1 プロセス常駐させ、各ステップを 1 つのユーザーターンとして送る。プロセスが持つ会話がそのまま被験体の文脈内の履歴になる。ログイン済みの Claude サブスクリプションの枠で動き、API キーも extra も要らない（`PATH` に `claude` があり、一度 `claude` を起動してログインしてあればよい）。`StreamingLLMSubject` は最新のステップだけを送り（`Result: Reward` / `Stimulus: Light ON`）、応答から行動名を読み取る。行動名が 1 つに定まらない応答は `Nothing` として出し、`invalid_count` に数える（元の応答は `history` に残る）。
+
+```python
+from ai_operant_box.agent.api_client import ClaudeCLIClient
+from ai_operant_box.agent.llm_agent import SYSTEM_PROMPT, StreamingLLMSubject
+from ai_operant_box.chamber.environment import OperantBox
+from ai_operant_box.chamber.schedule import ContinuousReinforcement
+
+with ClaudeCLIClient(model="haiku", system_prompt=SYSTEM_PROMPT) as client:
+    subject = StreamingLLMSubject(client)
+    box = OperantBox(subject=subject, schedule=ContinuousReinforcement())
+    for _ in range(20):
+        box.step(1.0)
+print(len(box.records), subject.invalid_count, client.latencies[-1])
+```
+
+`examples/claude_cli_crf.py` は同じセッションをコマンドラインから走らせ、累積記録（PNG。`viz` extra が要る）と、ステップごとの往復時間を含む JSON の要約を書き出す。
+
+system prompt は Claude Code の既定の prompt を置き換える（`--system-prompt`）。`--append-system-prompt` ではコーディング支援用の prompt が残り、小さいモデルは役割を断る。ツール・MCP サーバ・設定ファイルとその hook・セッションの保存はすべて切り、プロセスは空の一時ディレクトリで動くので、プロジェクトの `CLAUDE.md` は被験体に届かない。ただし CLI は system prompt の前に 1 文の自己紹介を、また作業ディレクトリ・モデル名・日付の短い注記を加える。これはどのセッションでも同じである。
+
+CRF でのステップあたりの往復時間の実測（1 台のマシン、2026 年 10 月）:
+
+| モデルの別名 | ステップ数 | 平均 秒 / ステップ | 最初のステップ 秒 |
+|---|---|---|---|
+| `haiku` | 20 | 1.1〜1.4 | 約 4 |
+| `haiku` | 150 | 0.8〜1.1 | 約 3〜4 |
+| `sonnet` | 20 | 1.9 | 約 2.5 |
+| `opus` | 20 | 2.6 | 約 3.9 |
+
+`haiku` では 150 ステップまでステップあたりの時間は伸びなかった。見積もりには `haiku` 1 ステップ 1.4 秒、`sonnet` 2.5 秒、`opus` 3.5 秒を使う。`haiku` の 600 ステップのセッションは約 14 分かかる。測定時点で別名 `haiku` は `claude-haiku-4-5-20251001` に解決された。別名が指すモデルは CLI が決める。
+
+**利用枠への影響。** 呼び出しは API の請求ではなく、サブスクリプションの利用枠を消費する。`client.last_result["total_cost_usd"]` はその会話の API 換算額で、枠の消費量の目安になる。`haiku` 150 ステップで約 0.24 USD 相当だった。報告される 7 日間の利用率（`client.rate_limit_info`）は、`haiku` 数百ステップの前後で小数 2 桁の精度では動かなかった。`sonnet` と `opus` はステップあたりの消費が大きい。`ClaudeCLIClient.generate()` は `LLMSubject` の状態を持たない `generate(model, system, messages)` 互換の口を残しているが、毎ステップ新しいプロセスを起動して全履歴を送り直すので遅く、既定にはしない。
 
 ## 自作の 50 行のチャンバーでは足りない理由
 

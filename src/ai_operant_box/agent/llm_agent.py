@@ -9,6 +9,10 @@ The optional ``SelfOptimizingLLMSubject`` extends the system prompt with
 behavioural feedback derived from session-level model fits (see
 :mod:`ai_operant_box.analytics.model_fit`).
 
+``StreamingLLMSubject`` instead talks to a resident conversation (for
+example :class:`ai_operant_box.agent.api_client.ClaudeCLIClient`, which needs
+no API key) and sends only the newest step each time.
+
 The Anthropic SDK is **not** imported by this module. The ``api_client``
 parameter is a duck-typed object exposing ``generate(model, system, messages)``;
 the production implementation is :class:`ai_operant_box.agent.api_client.AnthropicClient`,
@@ -17,9 +21,13 @@ imported lazily by callers.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from typing import Any
 
 from ai_operant_box.agent.base import Subject
+
+ACTIONS: tuple[str, ...] = ("Lever Press", "Grooming", "Explore", "Nothing")
 
 SYSTEM_PROMPT = (
     "You are a virtual organism in a controlled experimental chamber (Operant Box). "
@@ -86,6 +94,76 @@ class LLMSubject(Subject):
         return self._history
 
 
+def extract_action(text: str, actions: Sequence[str] = ACTIONS) -> str | None:
+    """Return the action named in a model reply, or ``None`` if it is invalid.
+
+    An exact match is accepted after stripping whitespace, quotes, Markdown
+    emphasis, and trailing punctuation (case-insensitive). Otherwise the
+    reply is accepted only if exactly one action name occurs in it.
+    """
+    cleaned = re.sub(r"^[\s*_`'\"]+|[\s*_`'\".!]+$", "", text).casefold()
+    for action in actions:
+        if cleaned == action.casefold():
+            return action
+    found = [a for a in actions if re.search(rf"\b{re.escape(a.casefold())}\b", cleaned)]
+    return found[0] if len(found) == 1 else None
+
+
+class StreamingLLMSubject(Subject):
+    """LLM subject backed by a resident conversation (``client.send``).
+
+    The client keeps the conversation, so each :meth:`act` sends only the
+    consequence of the previous step and the current SD::
+
+        Result: Reward
+        Stimulus: Light ON
+
+    The reply is parsed with :func:`extract_action`; a reply that names no
+    single action is emitted as ``"Nothing"`` and counted in
+    :attr:`invalid_count`. The raw reply is kept in each history entry.
+
+    Parameters
+    ----------
+    client : object
+        Exposes ``send(text) -> str``, e.g.
+        :class:`ai_operant_box.agent.api_client.ClaudeCLIClient`.
+    actions : sequence of str
+        Valid action names. Must include ``"Nothing"``.
+    """
+
+    def __init__(self, client: Any, actions: Sequence[str] = ACTIONS) -> None:
+        self.client = client
+        self.actions = tuple(actions)
+        self.current_sd: Any | None = None
+        self.invalid_count = 0
+        self._history: list[dict] = []
+
+    def sense(self, sd: Any) -> None:
+        self.current_sd = sd
+
+    def act(self) -> str:
+        lines = []
+        if self._history:
+            sr = self._history[-1].get("sr")
+            lines.append(f"Result: {'Reward' if sr else 'No Reward'}")
+        lines.append(f"Stimulus: {self.current_sd}")
+        raw = self.client.send("\n".join(lines))
+        action = extract_action(raw, self.actions)
+        if action is None:
+            self.invalid_count += 1
+            action = "Nothing"
+        self._history.append({"sd": self.current_sd, "raw": raw, "r": action})
+        return action
+
+    def learn(self, sr: Any | None) -> None:
+        if self._history:
+            self._history[-1]["sr"] = sr
+
+    @property
+    def history(self) -> list[dict]:
+        return self._history
+
+
 class SelfOptimizingLLMSubject(LLMSubject):
     """LLM subject that ingests post-session model-fit feedback.
 
@@ -145,4 +223,11 @@ class SelfOptimizingLLMSubject(LLMSubject):
         self.feedback_history.append({"r2": r_squared, "bias": bias_info})
 
 
-__all__ = ["LLMSubject", "SYSTEM_PROMPT", "SelfOptimizingLLMSubject"]
+__all__ = [
+    "ACTIONS",
+    "LLMSubject",
+    "SYSTEM_PROMPT",
+    "SelfOptimizingLLMSubject",
+    "StreamingLLMSubject",
+    "extract_action",
+]
