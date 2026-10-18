@@ -4,7 +4,7 @@ events and emit to an :class:`experiment_core.EventSink`.
 The asyncio simulator records its native :class:`BehavioralEvent` stream
 into a :class:`DataLogger` (in-memory). For downstream consumption by
 the operantkit pipeline (``session-recorder`` OKL v1 logs,
-``session-analyzer``, ``behavior-scope`` live tail, etc.) this module
+``session-analyzer``, ``session-visualizer`` live tail, etc.) this module
 provides a post-hoc converter that walks the recorded events and emits
 the subset that maps cleanly to
 :data:`experiment_core.events.SessionEvent`.

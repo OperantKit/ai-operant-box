@@ -22,3 +22,4 @@ tmp/
 *.py[cod]
 htmlcov/
 PLAN.md
+src/ai_operant_box/_version.py

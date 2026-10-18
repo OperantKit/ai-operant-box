@@ -1,4 +1,8 @@
-"""End-to-end FI-scallop simulation (no PNG output, deterministic counts)."""
+"""End-to-end FI-scallop simulation (no PNG output, deterministic counts).
+
+A smoke test only: the FI pattern is judged against published values in the
+operantkit meta-package's tests/laws/.
+"""
 
 from __future__ import annotations
 

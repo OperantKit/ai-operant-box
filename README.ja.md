@@ -29,9 +29,21 @@ LLM-as-subject シミュレータ。大規模言語モデルがオペラント�
 
 ## インストール
 
+clone した場合、本体に必要なのは NumPy だけ:
+
 ```bash
-mise exec -- python -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
+python -m venv .venv
+.venv/bin/python -m pip install -e .
+```
+
+数値エージェント・チャンバー・スケジュール・`ai-operant-box` コマンドは
+これで動く。開発用 extra はテスト道具と、任意の OperantKit ライブラリ
+（session-analyzer、experiment-core、session-recorder）を加える。
+それらがまだパッケージインデックスから入手できない場合は、wheel を
+1 つのディレクトリにビルドまたはダウンロードし、pip にそこを指定する:
+
+```bash
+.venv/bin/python -m pip install --find-links <wheel-dir> -e ".[dev]"
 ```
 
 LLM バックエンドの被験体を有効化するには:
@@ -60,22 +72,24 @@ Anthropic SDK を行使するテストは、`anthropic` パッケージがイン
 3. **SR (結果)** — `Schedule` が `Subject` に供給し、`Subject` の
    `learn(reinforcer)` が内部状態を更新する。
 
-## ローカル依存関係に関する注記
+## 任意の extra と OperantKit ライブラリ
 
-v0 実装は姉妹パッケージ `contingency-py`、`experiment-core`、
-`experiment-io`、`session-recorder`、`session-analyzer` に依存していた。
-本スキャフォールドではそれらの依存は延期されている:
+本体の依存は NumPy だけ。他の OperantKit ライブラリは任意で、遅延
+インポートされる:
+
+| Extra | 入るもの | 使う箇所 |
+|---|---|---|
+| `viz` | `session-analyzer`、matplotlib、SciPy | `ai_operant_box.analytics`（累積記録、スキャロップの当てはめ） |
+| `canonical` | `experiment-core`、`session-recorder` | `ai_operant_box.async_simulator.canonical_sink`（独自の事象列を OKL v1 に写す） |
+| `llm` | `anthropic` | `ai_operant_box.agent.api_client` |
+
+その他:
 
 - 小さな `chamber.environment.VirtualClock`（`ManualClock` スタイルの
   単調カウンタ）がローカルに提供され、`experiment-io` の HAL なしで
   chamber を走らせられる。
-- JSONL イベントロギングは内部実装で、後に `session-recorder` の
-  `SessionLogger` と置き換え可能。
 - スケジュール・プリミティブ (`chamber.schedule` と `schedules/`) は
-  独立しており、`contingency-py` とは今のところ別。
-
-周囲のアプリが安定したら、これらのシムはエージェント / chamber コード
-に触れることなく適切なパッケージに置き換えられる。
+  本パッケージ内の実装。`contingency-py` は import しない。
 
 ## Anthropic SDK（オプトイン）
 

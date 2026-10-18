@@ -27,9 +27,22 @@ The package provides:
 
 ## Install
 
+From a clone, the core package needs only NumPy:
+
 ```bash
-mise exec -- python -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
+python -m venv .venv
+.venv/bin/python -m pip install -e .
+```
+
+This is enough for the numerical agents, the chambers, the schedules, and
+the `ai-operant-box` command. The development extra adds the test tools
+and the optional OperantKit libraries (session-analyzer, experiment-core,
+session-recorder). If those libraries are not yet available from your
+package index, build or download their wheels into one directory and
+point pip at it:
+
+```bash
+.venv/bin/python -m pip install --find-links <wheel-dir> -e ".[dev]"
 ```
 
 To enable the LLM-backed subject:
@@ -58,22 +71,24 @@ Code structure mirrors the basic operant unit:
 3. **SR (Consequence)** — delivered by the `Schedule` to the `Subject` whose
    `learn(reinforcer)` updates internal state.
 
-## Local dependency notes
+## Optional extras and OperantKit libraries
 
-The v0 implementation depended on the sibling packages `contingency-py`,
-`experiment-core`, `experiment-io`, `session-recorder`, and `session-analyzer`.
-Those dependencies are deferred in this scaffold:
+The core package depends only on NumPy. Other OperantKit libraries are
+optional and imported lazily:
+
+| Extra | Installs | Used by |
+|---|---|---|
+| `viz` | `session-analyzer`, matplotlib, SciPy | `ai_operant_box.analytics` (cumulative records, scallop fit) |
+| `canonical` | `experiment-core`, `session-recorder` | `ai_operant_box.async_simulator.canonical_sink` (mirror the native event stream to OKL v1) |
+| `llm` | `anthropic` | `ai_operant_box.agent.api_client` |
+
+Other notes:
 
 - A small `chamber.environment.VirtualClock` (`ManualClock`-style monotonic
-  counter) is provided locally so the chamber can run without
+  counter) is provided locally, so the chamber runs without
   `experiment-io`'s HAL.
-- JSONL event logging is internal and can later be replaced with the
-  `session-recorder` `SessionLogger`.
-- Schedule primitives are independent (`chamber.schedule` and `schedules/`),
-  separate from `contingency-py` for now.
-
-When the surrounding apps stabilise, these shims can be replaced with the
-proper packages without touching agent / chamber code.
+- Schedule primitives (`chamber.schedule` and `schedules/`) are implemented
+  here. This package does not import `contingency-py`.
 
 ## Anthropic SDK (opt-in)
 
