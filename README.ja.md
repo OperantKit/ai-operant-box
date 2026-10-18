@@ -127,6 +127,23 @@ CRF でのステップあたりの往復時間の実測（1 台のマシン、20
 
 **利用枠への影響。** 呼び出しは API の請求ではなく、サブスクリプションの利用枠を消費する。`client.last_result["total_cost_usd"]` はその会話の API 換算額で、枠の消費量の目安になる。`haiku` 150 ステップで約 0.24 USD 相当だった。報告される 7 日間の利用率（`client.rate_limit_info`）は、`haiku` 数百ステップの前後で小数 2 桁の精度では動かなかった。`sonnet` と `opus` はステップあたりの消費が大きい。`ClaudeCLIClient.generate()` は `LLMSubject` の状態を持たない `generate(model, system, messages)` 互換の口を残しているが、毎ステップ新しいプロセスを起動して全履歴を送り直すので遅く、既定にはしない。
 
+## 局所モデルで反応確率を直接読む
+
+ホストされたチャット API は文字列しか返さないので、モデルがレバーを押す確率は、応答を何度も標本抽出して推定するしかない。llama.cpp で動かす局所の GGUF モデルは次のトークンの logits を出すので、`ai_operant_box.agent.local_logprob` は各ステップで各行動の確率を標本抽出なしに直接計算する（`local` extra: `llama-cpp-python`）。
+
+- `LocalLogprobClient` は ChatML の会話（Qwen をはじめ多くの指示調整済み GGUF モデルのチャット形式）を保持する。`score(text)` はユーザーのターンを足し、各行動について、それをアシスタントの返答としたときのトークン列全体の対数確率（各トークンの確率の積）、先頭トークンだけの対数確率、行動の集合の中で正規化し直した確率を返す。`temperature` は softmax の前に各トークンの logits を割る。
+- `LlamaCppBackend` は各 prompt のうち前のステップから新しく増えた部分だけを評価するので、600 ステップのセッションでも速い。
+- `LocalLogprobSubject` は他の被験体と同じく `OperantBox` で走る。チャンバーがスケジュールを当てるには行動が 1 つ発せられる必要があり、それは計算した分布から種付きで引いた行動（`policy="sample"`）か、最も確率の高い行動（`policy="greedy"`）である。`history` の各要素は、そのステップで読んだ確率 `p` を持つ。
+
+```bash
+.venv/bin/python -m pip install -e ".[local,viz]"
+.venv/bin/python examples/local_logprob_fi.py --model path/to/model.gguf --interval 30 --steps 600 --out-dir runs/fi30
+```
+
+このスクリプトは P(Lever Press) をセッション時間に沿って、また前の強化子からの経過時間ごとの平均として描き、全ステップの確率を JSON に書き出す。Qwen2.5-1.5B-Instruct（Q4_K_M）を Apple silicon の 1 台で動かすと、FI 30 の 600 ステップに約 7 分かかった（1 ステップ平均 0.7 秒。prompt は約 13,000 トークンまで伸びた）。このトークナイザーでは `Lever Press` と `Grooming` の先頭トークンが 1 文字（`L`、`G`）なので、正規化し直すのは先頭トークンの確率ではなくトークン列全体の確率である。
+
+再利用した prefix の結果を最初から評価し直した結果と突き合わせるテストは、環境変数 `AOB_GGUF` が GGUF ファイルを指すときだけ走る。他のテストは偽のバックエンドを使い、モデルは要らない。
+
 ## 自作の 50 行のチャンバーでは足りない理由
 
 モデルに「押すか押さないか」を尋ねて押した回数を数える短いループには、結果を動物のデータと比べられるようにする部分が欠けている:
@@ -167,6 +184,7 @@ Anthropic SDK を行使するテストは、`anthropic` パッケージがイン
 | `viz` | `session-analyzer`、matplotlib、SciPy | `ai_operant_box.analytics`（累積記録、スキャロップの当てはめ） |
 | `canonical` | `experiment-core`、`session-recorder` | `ai_operant_box.async_simulator.canonical_sink`（独自の事象列を OKL v1 に写す） |
 | `llm` | `anthropic` | `ai_operant_box.agent.api_client` |
+| `local` | `llama-cpp-python` | `ai_operant_box.agent.local_logprob` |
 
 その他:
 

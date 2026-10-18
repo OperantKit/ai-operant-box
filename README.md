@@ -126,6 +126,23 @@ The per-step time did not grow over 150 steps with `haiku`. Budget about 1.4 s p
 
 **Usage limits.** The calls count against the subscription's usage limits, not an API bill. `client.last_result["total_cost_usd"]` is the conversation's API-equivalent price, a proxy for that usage: 150 `haiku` steps came to about 0.24 USD-equivalent, and the reported seven-day utilisation (`client.rate_limit_info`) did not move at its two-decimal resolution across several hundred `haiku` steps. `sonnet` and `opus` use the limits faster per step. `ClaudeCLIClient.generate()` keeps the stateless `generate(model, system, messages)` interface of `LLMSubject`, but it starts a new process and re-sends the whole history every step, so it is slower and is not the default.
 
+## Reading response probabilities from a local model
+
+Hosted chat APIs return text only, so the probability that a model presses the lever can only be estimated by sampling its reply many times. A local GGUF model run through llama.cpp exposes its next-token logits, so `ai_operant_box.agent.local_logprob` computes the probability of each action directly at every step, without sampling (`local` extra: `llama-cpp-python`).
+
+- `LocalLogprobClient` keeps a ChatML conversation (the chat format of Qwen and many other instruction-tuned GGUF models). `score(text)` adds a user turn and returns, for each action, the log-probability of its whole token sequence as the assistant's reply (product of the token probabilities), the log-probability of its first token alone, and the probabilities renormalised over the action set. `temperature` divides every token's logits before the softmax.
+- `LlamaCppBackend` evaluates only the part of each prompt that is new since the previous step, so a 600-step session stays fast.
+- `LocalLogprobSubject` runs in `OperantBox` like any other subject. The chamber needs an emitted action to apply the schedule; it is a seeded draw from the computed distribution (`policy="sample"`) or the most probable action (`policy="greedy"`). Each `history` entry keeps the probabilities `p` read at that step.
+
+```bash
+.venv/bin/python -m pip install -e ".[local,viz]"
+.venv/bin/python examples/local_logprob_fi.py --model path/to/model.gguf --interval 30 --steps 600 --out-dir runs/fi30
+```
+
+The script plots P(Lever Press) over the session and its mean by time since the previous reinforcer, and writes every step's probabilities to JSON. With Qwen2.5-1.5B-Instruct (Q4_K_M) on one Apple-silicon machine, 600 FI 30 steps took about 7 minutes (0.7 s per step on average; the prompt grew to about 13,000 tokens). The first tokens of `Lever Press` and `Grooming` are single letters (`L`, `G`) for that tokenizer, which is why the whole-sequence probability, not the first-token probability, is renormalised.
+
+The test that checks the reused prefix against a fresh evaluation runs only when the environment variable `AOB_GGUF` names a GGUF file; the other tests use a fake backend and need no model.
+
 ## Why not a 50-line hand-written chamber?
 
 A short loop that asks a model "press or not" and counts presses leaves out what makes the result comparable with animal data:
@@ -166,6 +183,7 @@ optional and imported lazily:
 | `viz` | `session-analyzer`, matplotlib, SciPy | `ai_operant_box.analytics` (cumulative records, scallop fit) |
 | `canonical` | `experiment-core`, `session-recorder` | `ai_operant_box.async_simulator.canonical_sink` (mirror the native event stream to OKL v1) |
 | `llm` | `anthropic` | `ai_operant_box.agent.api_client` |
+| `local` | `llama-cpp-python` | `ai_operant_box.agent.local_logprob` |
 
 Other notes:
 

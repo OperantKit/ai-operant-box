@@ -35,6 +35,11 @@ dependencies = [
 llm = [
     "anthropic>=0.39",
 ]
+# Local GGUF models through llama.cpp, for reading action probabilities
+# from the logits (ai_operant_box.agent.local_logprob).
+local = [
+    "llama-cpp-python>=0.3",
+]
 # Cumulative-record rendering delegates to session-analyzer for canonical
 # Ferster & Skinner style (Lattal, 2004); scipy backs the FI scallop fit.
 viz = [
