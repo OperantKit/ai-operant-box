@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import unittest
 from unittest.mock import patch
 
@@ -67,6 +68,12 @@ class TestRatioSchedules(unittest.TestCase):
             self.assertEqual(schedule.reinforce_at_response, 5)
 
     def test_variable_ratio_schedule_mean_approximation(self):
+        # The ratio sequence is 100 exponential draws, so its mean has an SD of
+        # about 2 and an unseeded run falls outside the 20% tolerance for
+        # roughly 1 seed in 15. Fix the seed and restore the global state.
+        state = random.getstate()
+        self.addCleanup(random.setstate, state)
+        random.seed(42)
         mean_ratio = 20
         schedule = VariableRatioSchedule(mean_ratio=mean_ratio, iterations=100)
         num_reinforcements = 1000
