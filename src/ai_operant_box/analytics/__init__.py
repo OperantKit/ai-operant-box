@@ -5,6 +5,7 @@ functions, so the analytics subpackage can be imported without those
 optional plotting / fitting dependencies installed.
 """
 
+from ai_operant_box.analytics.fi_measures import FISummary, summarize_fi
 from ai_operant_box.analytics.matching import (
     ChoiceTotals,
     GeneralizedMatchingFit,
@@ -21,6 +22,7 @@ from ai_operant_box.analytics.record import (
 __all__ = [
     "ChoiceTotals",
     "CumulativeRecorder",
+    "FISummary",
     "GeneralizedMatchingFit",
     "LiveVisualizer",
     "ModelFitAnalyzer",
@@ -28,4 +30,5 @@ __all__ = [
     "choice_totals",
     "fit_generalized_matching",
     "scallop_model",
+    "summarize_fi",
 ]
