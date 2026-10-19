@@ -144,6 +144,22 @@ CRF でのステップあたりの往復時間の実測（1 台のマシン、20
 
 再利用した prefix の結果を最初から評価し直した結果と突き合わせるテストは、環境変数 `AOB_GGUF` が GGUF ファイルを指すときだけ走る。他のテストは偽のバックエンドを使い、モデルは要らない。
 
+## 2 本のレバー: 並立 VI VI とマッチング法則
+
+`ai_operant_box.chamber.concurrent.ConcurrentBox` は、`OperantBox` と同じ SD-R-SR のステップを 2 つの操作体で走らせる（`concurrent` extra: `contingency-py`）。切替後遅延（COD; Catania, 1966）を含む強化の判定は `contingency-py` の `Concurrent` スケジュールが行う。`concurrent_vi_vi(mean_left, mean_right, cod=2.0, seed=...)` は種付きの成分で `Conc VI VI` を作る。
+
+- **被験体の I/F。** どの `Subject` でも使える。`act()` は行動名を返し、`operanda` がレバー押しとみなす行動名を操作体のキーに写す。既定は `"Left Lever"` → `"left"`、`"Right Lever"` → `"right"`（LLM 被験体向けの語彙は `CONCURRENT_ACTIONS = ("Left Lever", "Right Lever", "Nothing")`。例: `StreamingLLMSubject(client, actions=CONCURRENT_ACTIONS)`）。それ以外の行動名は反応ではなく、スケジュールには時間の刻みだけが渡る。`learn()` は直前に押したレバーについて `"Food Pellet"` か `None` を受け取る。
+- **記録。** 反応 1 回が `ChoiceRecord(timestamp, operandum, is_reinforced, cod_suppressed)` 1 件になる。
+- **マッチングの当てはめ。** `ai_operant_box.analytics.matching.choice_totals(records, start=...)` は助走の後のレバーごとの反応数と強化数を数え、`fit_generalized_matching(b1, b2, r1, r2)` は条件をまたいで `log(B1/B2) = a * log(R1/R2) + log b`（常用対数; Baum, 1974）を最小二乗で当てはめ、`a`・`log_b`・R² を返す。
+- **参照用の被験体。** `MatchingAgent(sensitivity=s, mean_visit=v)` は毎ステップどちらかのレバーを押し、得た強化子から確率 `R_L^s / (R_L^s + R_R^s)` で左を選び、1 ステップごとに確率 `1/v` でレバーを選び直す。チャンバーと当てはめを確かめるためのもので、生体のモデルではない。
+
+```bash
+.venv/bin/python -m pip install -e ".[concurrent]"
+.venv/bin/python examples/concurrent_matching.py --cod 0 --sensitivity 1
+```
+
+強化子の比 4 水準（1:1、1:3、3:1、1:9。全体で 10 秒に 1 強化。1 秒のステップを 4,000 回、最初の 1,000 回は除く）で、参照用の被験体は COD なしで `a = 1.006`、`log b = 0.015`、R² = 0.998、`sensitivity=0.5` で `a = 0.450` だった。COD 2 秒のときの結果は、入っている `contingency-py` で変わる。0.1.1 は COD の間に準備された強化子を捨てるので、乏しい側のレバーがその強化子を失い、参照用の被験体は片側だけを選ぶ状態に流れる（強化数 0 のレバーがあると当てはめは定義できない）。COD 後の最初の反応まで強化子を保持する `contingency-py`（Herrnstein, 1961）では `a = 0.966`、`log b = 0.015`、R² = 0.997 だった。COD ありのテストは、入っている `contingency-py` が強化子を捨てる場合はスキップされる。
+
 ## 自作の 50 行のチャンバーでは足りない理由
 
 モデルに「押すか押さないか」を尋ねて押した回数を数える短いループには、結果を動物のデータと比べられるようにする部分が欠けている:
@@ -185,14 +201,16 @@ Anthropic SDK を行使するテストは、`anthropic` パッケージがイン
 | `canonical` | `experiment-core`、`session-recorder` | `ai_operant_box.async_simulator.canonical_sink`（独自の事象列を OKL v1 に写す） |
 | `llm` | `anthropic` | `ai_operant_box.agent.api_client` |
 | `local` | `llama-cpp-python` | `ai_operant_box.agent.local_logprob` |
+| `concurrent` | `contingency-py` | `ai_operant_box.chamber.concurrent` |
 
 その他:
 
 - 小さな `chamber.environment.VirtualClock`（`ManualClock` スタイルの
   単調カウンタ）がローカルに提供され、`experiment-io` の HAL なしで
   chamber を走らせられる。
-- スケジュール・プリミティブ (`chamber.schedule` と `schedules/`) は
-  本パッケージ内の実装。`contingency-py` は import しない。
+- 単一レバーのスケジュール・プリミティブ (`chamber.schedule` と
+  `schedules/`) は本パッケージ内の実装。`contingency-py` を import するのは
+  `chamber.concurrent` だけ（`concurrent` extra）。
 
 ## Anthropic SDK（オプトイン）
 
@@ -207,11 +225,20 @@ Anthropic SDK を行使するテストは、`anthropic` パッケージがイン
 - Baum, W. M., & Grace, R. C. (2020). Matching theory and induction explain
   operant performance. *Journal of the Experimental Analysis of Behavior*,
   *113*(2), 390-418. https://doi.org/10.1002/jeab.583
+- Baum, W. M. (1974). On two types of deviation from the matching law:
+  Bias and undermatching. *Journal of the Experimental Analysis of
+  Behavior*, *22*(1), 231-242. https://doi.org/10.1901/jeab.1974.22-231
 - Benvenuti, M. F., et al. (2024). The role of schedules of reinforcement in
   the experimental analysis of social behavior. *Perspectives on Behavior
   Science*. https://doi.org/10.1007/s40614-024-00421-5
+- Catania, A. C. (1966). Concurrent performances: Reinforcement
+  interaction and response independence. *Journal of the Experimental
+  Analysis of Behavior*, *9*(3), 253-263. https://doi.org/10.1901/jeab.1966.9-253
 - Fleshler, M., & Hoffman, H. S. (1962). A progression for generating
   variable-interval schedules. *Journal of the Experimental Analysis of
   Behavior*, *5*(4), 529-530. https://doi.org/10.1901/jeab.1962.5-529
+- Herrnstein, R. J. (1961). Relative and absolute strength of response as
+  a function of frequency of reinforcement. *Journal of the Experimental
+  Analysis of Behavior*, *4*(3), 267-272. https://doi.org/10.1901/jeab.1961.4-267
 - Skinner, B. F. (1938). *The behavior of organisms: An experimental
   analysis*. Appleton-Century.

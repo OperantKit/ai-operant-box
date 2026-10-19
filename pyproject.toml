@@ -40,6 +40,11 @@ llm = [
 local = [
     "llama-cpp-python>=0.3",
 ]
+# Concurrent schedules with a changeover delay come from contingency-py
+# (ai_operant_box.chamber.concurrent).
+concurrent = [
+    "contingency-py>=0.1.1,<0.2",
+]
 # Cumulative-record rendering delegates to session-analyzer for canonical
 # Ferster & Skinner style (Lattal, 2004); scipy backs the FI scallop fit.
 viz = [
@@ -63,6 +68,7 @@ test = [
     "scipy>=1.11",
     "experiment-core>=0.1.1,<0.2",
     "session-recorder>=0.1.1,<0.2",
+    "contingency-py>=0.1.1,<0.2",
 ]
 dev = [
     "pytest>=8",
@@ -73,6 +79,7 @@ dev = [
     "scipy>=1.11",
     "experiment-core>=0.1.1,<0.2",
     "session-recorder>=0.1.1,<0.2",
+    "contingency-py>=0.1.1,<0.2",
     "mypy>=1.10",
     "ruff>=0.5",
 ]
