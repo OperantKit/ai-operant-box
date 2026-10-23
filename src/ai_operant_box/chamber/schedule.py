@@ -47,4 +47,49 @@ class FixedInterval(ReinforcementSchedule):
         return False
 
 
-__all__ = ["ContinuousReinforcement", "Extinction", "FixedInterval", "ReinforcementSchedule"]
+class DifferentialReinforcementOfLowRate(ReinforcementSchedule):
+    """DRL — a target response is reinforced if ``interval`` s have passed
+    since the last counted response.
+
+    The clock starts at session time 0, so the first response is timed from
+    the session start (it is not reinforced unconditionally). Every counted
+    response restarts the clock, reinforced or not. Responses within
+    ``post_reinforcement_s`` after a reinforcer (the reinforcer delivery
+    period) are not counted: they are never reinforced and do not restart the
+    clock, which restarts at the end of that period instead.
+    """
+
+    def __init__(self, interval: float, target_response: str = "Lever Press",
+                 post_reinforcement_s: float = 0.0) -> None:
+        if interval <= 0:
+            raise ValueError("interval must be positive")
+        if post_reinforcement_s < 0:
+            raise ValueError("post_reinforcement_s must be non-negative")
+        self.interval = interval
+        self.target_response = target_response
+        self.post_reinforcement_s = post_reinforcement_s
+        self.timer_start: float = 0.0
+        self.last_reinforcement_time: float | None = None
+
+    def is_reinforced(self, response: str, current_time: float) -> bool:
+        if response != self.target_response:
+            return False
+        if (self.last_reinforcement_time is not None
+                and current_time < self.last_reinforcement_time + self.post_reinforcement_s):
+            return False
+        reinforced = current_time - self.timer_start >= self.interval
+        if reinforced:
+            self.last_reinforcement_time = current_time
+            self.timer_start = current_time + self.post_reinforcement_s
+        else:
+            self.timer_start = current_time
+        return reinforced
+
+
+__all__ = [
+    "ContinuousReinforcement",
+    "DifferentialReinforcementOfLowRate",
+    "Extinction",
+    "FixedInterval",
+    "ReinforcementSchedule",
+]

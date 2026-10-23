@@ -8,6 +8,7 @@ from ai_operant_box.chamber.interdependent import (
 )
 from ai_operant_box.chamber.schedule import (
     ContinuousReinforcement,
+    DifferentialReinforcementOfLowRate,
     Extinction,
     FixedInterval,
     ReinforcementSchedule,
@@ -15,6 +16,7 @@ from ai_operant_box.chamber.schedule import (
 
 __all__ = [
     "ContinuousReinforcement",
+    "DifferentialReinforcementOfLowRate",
     "Extinction",
     "FixedInterval",
     "InterdependentSchedule",
