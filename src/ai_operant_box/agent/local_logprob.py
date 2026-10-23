@@ -155,6 +155,10 @@ class LocalLogprobClient:
         Candidate replies. Their token sequences must differ.
     temperature : float
         Applied to every token's logits before the softmax.
+    history_window : int or None
+        Number of most recent (user, assistant) pairs rendered before the
+        current user turn. ``None`` (default) renders all of them; ``0``
+        renders only the current user turn. :attr:`messages` keeps every turn.
     """
 
     def __init__(
@@ -163,9 +167,13 @@ class LocalLogprobClient:
         system_prompt: str = SYSTEM_PROMPT,
         actions: Sequence[str] = ACTIONS,
         temperature: float = 1.0,
+        history_window: int | None = None,
     ) -> None:
         if temperature <= 0:
             raise ValueError("temperature must be positive")
+        if history_window is not None and history_window < 0:
+            raise ValueError("history_window must be None or a non-negative integer")
+        self.history_window = history_window
         self.backend = backend
         self.system_prompt = system_prompt
         self.actions = tuple(actions)
@@ -179,7 +187,10 @@ class LocalLogprobClient:
     def score(self, user_text: str) -> ActionScores:
         """Append a user turn and score every action as the assistant's reply."""
         self.messages.append(("user", user_text))
-        prompt = self.backend.tokenize(chatml_prompt(self.system_prompt, self.messages))
+        shown = self.messages
+        if self.history_window is not None:
+            shown = self.messages[-(2 * self.history_window + 1) :]
+        prompt = self.backend.tokenize(chatml_prompt(self.system_prompt, shown))
         first_logits = self.backend.next_logits(prompt)
         seq_lp: dict[str, float] = {}
         first_lp: dict[str, float] = {}

@@ -40,19 +40,36 @@ SYSTEM_PROMPT = (
 
 
 class LLMSubject(Subject):
-    """LLM-driven subject that learns through in-context history."""
+    """LLM-driven subject that learns through in-context history.
+
+    Parameters
+    ----------
+    history_window : int or None
+        Number of most recent completed trials shown in the prompt.
+        ``None`` (default) shows all of them; ``0`` shows none.
+    summary_only : bool
+        If true, no trials are shown; instead the system prompt sent with
+        each call ends with the counts of reinforcers and Lever Press
+        responses so far. ``history_window`` is then ignored.
+    """
 
     def __init__(
         self,
         api_client: Any,
         model: str = "claude-3-5-sonnet-latest",
         system_prompt: str | None = None,
+        history_window: int | None = None,
+        summary_only: bool = False,
     ) -> None:
+        if history_window is not None and history_window < 0:
+            raise ValueError("history_window must be None or a non-negative integer")
         self.api_client = api_client
         self.model = model
         self._history: list[dict] = []
         self.current_sd: Any | None = None
         self.system_prompt = system_prompt or SYSTEM_PROMPT
+        self.history_window = history_window
+        self.summary_only = summary_only
 
     def sense(self, sd: Any) -> None:
         self.current_sd = sd
@@ -61,7 +78,7 @@ class LLMSubject(Subject):
         messages = self._build_messages()
         response = self.api_client.generate(
             model=self.model,
-            system=self.system_prompt,
+            system=self._build_system(),
             messages=messages,
         )
         action = response.strip()
@@ -72,11 +89,30 @@ class LLMSubject(Subject):
         if self._history:
             self._history[-1]["sr"] = sr
 
+    def _completed(self) -> list[dict]:
+        return [h for h in self._history if "sr" in h]
+
+    def _build_system(self) -> str:
+        if not self.summary_only:
+            return self.system_prompt
+        completed = self._completed()
+        n_rewards = sum(1 for h in completed if h["sr"])
+        n_presses = sum(1 for h in completed if h["r"] == "Lever Press")
+        return (
+            f"{self.system_prompt}\n\nSummary so far: {n_rewards} rewards received, "
+            f"{n_presses} Lever Press responses made."
+        )
+
     def _build_messages(self) -> list[dict]:
+        completed = self._completed()
+        if self.summary_only:
+            shown: list[dict] = []
+        elif self.history_window is None:
+            shown = completed
+        else:
+            shown = completed[max(0, len(completed) - self.history_window) :]
         msgs: list[dict] = []
-        for h in self._history:
-            if "sr" not in h:
-                continue
+        for h in shown:
             msgs.append({"role": "user", "content": f"Stimulus: {h['sd']}"})
             msgs.append({"role": "assistant", "content": h["r"]})
             msgs.append(
@@ -121,6 +157,11 @@ class StreamingLLMSubject(Subject):
     The reply is parsed with :func:`extract_action`; a reply that names no
     single action is emitted as ``"Nothing"`` and counted in
     :attr:`invalid_count`. The raw reply is kept in each history entry.
+
+    There is no history window here: the resident conversation keeps every
+    turn, so it cannot be truncated from this side. To limit the history,
+    use ``LLMSubject(api_client=ClaudeCLIClient(...), model=<alias>,
+    history_window=k)``, which sends a fresh transcript on every step.
 
     Parameters
     ----------

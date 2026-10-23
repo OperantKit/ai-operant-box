@@ -44,12 +44,20 @@ def main() -> None:
     parser.add_argument("--policy", choices=("sample", "greedy"), default="sample")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n-ctx", type=int, default=32768)
+    parser.add_argument(
+        "--history-window",
+        type=int,
+        default=None,
+        help="render only the last N (user, assistant) pairs (default: all)",
+    )
     parser.add_argument("--out-dir", type=Path, default=Path("runs/fi_local"))
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     backend = LlamaCppBackend(str(args.model), n_ctx=args.n_ctx)
-    client = LocalLogprobClient(backend, temperature=args.temperature)
+    client = LocalLogprobClient(
+        backend, temperature=args.temperature, history_window=args.history_window
+    )
     subject = LocalLogprobSubject(client, policy=args.policy, seed=args.seed)
     box = OperantBox(subject=subject, schedule=FixedInterval(args.interval))
 
@@ -69,6 +77,8 @@ def main() -> None:
     stem = (
         f"fi{int(args.interval)}_{args.model.stem}_T{args.temperature:g}_{args.policy}{args.seed}"
     )
+    if args.history_window is not None:
+        stem += f"_w{args.history_window}"
     png = args.out_dir / f"{stem}.png"
     _plot(png, times, p_lp, reinforced, curve, args)
 
@@ -80,6 +90,7 @@ def main() -> None:
         "temperature": args.temperature,
         "policy": args.policy,
         "seed": args.seed,
+        "history_window": args.history_window,
         "reinforcers": sum(reinforced),
         "action_counts": {a: actions.count(a) for a in client.actions},
         "p_lever_press_mean": statistics.mean(p_lp),

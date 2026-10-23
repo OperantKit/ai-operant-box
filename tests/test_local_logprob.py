@@ -78,6 +78,41 @@ def test_scoring_does_not_commit_and_commit_appends_assistant_turn():
     assert "<|im_start|>assistant\na<|im_end|>" in last_prompt
 
 
+def test_history_window_renders_only_recent_pairs():
+    backend = FakeBackend()
+    client = LocalLogprobClient(backend, system_prompt="s", actions=("a", "b"), history_window=2)
+    for i in range(4):
+        client.score(f"u{i}")
+        client.commit(f"r{i}")
+    client.score("u4")
+    # all turns are kept for the record
+    assert len(client.messages) == 9
+    last_prompt = "".join(chr(t) for t in backend.calls[-1])
+    assert last_prompt.startswith(
+        "<|im_start|>system\ns<|im_end|>\n"
+        "<|im_start|>user\nu2<|im_end|>\n<|im_start|>assistant\nr2<|im_end|>\n"
+    )
+    assert "u4<|im_end|>\n<|im_start|>assistant\n" in last_prompt
+    assert "u1" not in last_prompt and "r1" not in last_prompt
+
+
+def test_history_window_zero_renders_only_current_user_turn():
+    backend = FakeBackend()
+    client = LocalLogprobClient(backend, system_prompt="s", actions=("a", "b"), history_window=0)
+    client.score("u0")
+    client.commit("r0")
+    client.score("u1")
+    last_prompt = "".join(chr(t) for t in backend.calls[-1])
+    assert last_prompt.startswith(
+        "<|im_start|>system\ns<|im_end|>\n<|im_start|>user\nu1<|im_end|>\n<|im_start|>assistant\n"
+    )
+
+
+def test_negative_history_window_is_rejected_by_client():
+    with pytest.raises(ValueError):
+        LocalLogprobClient(FakeBackend(), system_prompt="s", actions=("a", "b"), history_window=-1)
+
+
 def test_rejects_actions_with_identical_token_sequences():
     with pytest.raises(ValueError):
         LocalLogprobClient(FakeBackend(), system_prompt="s", actions=("a", "a"))
