@@ -8,12 +8,14 @@ from ai_operant_box.chamber.interdependent import (
 )
 from ai_operant_box.chamber.schedule import (
     ContinuousReinforcement,
+    Extinction,
     FixedInterval,
     ReinforcementSchedule,
 )
 
 __all__ = [
     "ContinuousReinforcement",
+    "Extinction",
     "FixedInterval",
     "InterdependentSchedule",
     "LeaderFollowerBox",

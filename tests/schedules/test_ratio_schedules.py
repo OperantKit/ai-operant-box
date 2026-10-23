@@ -26,7 +26,7 @@ class TestRatioSchedules(unittest.TestCase):
 
     def test_variable_ratio_schedule_reinforcement_delivery(self):
         with patch(
-            "ai_operant_box.schedules.ratio._fleshler_hoffman_sequence",
+            "ai_operant_box.schedules.ratio._exponential_sequence",
             return_value=[5, 10, 5],
         ):
             schedule = VariableRatioSchedule(mean_ratio=7)

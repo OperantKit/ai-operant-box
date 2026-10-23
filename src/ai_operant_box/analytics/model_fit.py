@@ -20,39 +20,66 @@ def scallop_model(t, k):
 
 
 class ModelFitAnalyzer:
-    """Empirical-vs-model fitter for FI sessions."""
+    """Empirical-vs-model fitter for FI sessions.
 
-    def __init__(self, records: list[ResponseRecord], interval: float) -> None:
+    Parameters
+    ----------
+    records : list[ResponseRecord]
+        Chamber records. Reinforcer times are taken from every record with
+        ``is_reinforced``, whatever ``response_type`` is.
+    interval : float
+        FI value in seconds; bins cover ``0..interval``.
+    response_type : str, optional
+        Count only records whose ``response`` equals this (e.g.
+        ``"Lever Press"``). ``None`` counts every record with a response.
+    """
+
+    def __init__(
+        self,
+        records: list[ResponseRecord],
+        interval: float,
+        response_type: str | None = None,
+    ) -> None:
         self.records = records
         self.interval = interval
+        self.response_type = response_type
+
+    def _time_since_reinforcer(self, t: float, sr_times: np.ndarray) -> float:
+        # A response reinforced at t was emitted before its reinforcer, so both
+        # responses and opportunities are timed from the last reinforcer
+        # strictly before t (session start counts as one at 0).
+        earlier = sr_times[sr_times < t]
+        return float(t - earlier.max()) if earlier.size else float(t)
 
     def get_empirical_probabilities(self, bin_size: float = 1.0):
+        """Per-bin ``P(R | t)`` with one opportunity per chamber step.
+
+        Opportunities are the step times ``bin_size, 2 * bin_size, ...`` up to
+        the last record (the chamber's step is assumed equal to ``bin_size``).
+        Each counted response falls in the same bin as the opportunity at its
+        own time, so ``P <= 1``. Bins without an opportunity are omitted.
+        """
         if not self.records:
             return np.array([]), np.array([])
 
+        sr_times = np.array([r.timestamp for r in self.records if r.is_reinforced])
         last_time = self.records[-1].timestamp
-        t_opportunities = np.arange(0, last_time, bin_size)
+        t_opportunities = np.arange(bin_size, last_time + bin_size / 2, bin_size)
 
-        sr_times_arr = np.array(
-            [0.0] + [r.timestamp for r in self.records if r.is_reinforced]
+        rel_times = np.array(
+            [self._time_since_reinforcer(float(t), sr_times) for t in t_opportunities]
         )
+        rel_times = rel_times[rel_times <= self.interval]
 
-        rel_times_list: list[float] = []
-        for t in t_opportunities:
-            last_sr = sr_times_arr[sr_times_arr <= t].max()
-            rel_t = t - last_sr
-            if rel_t <= self.interval:
-                rel_times_list.append(float(rel_t))
-
-        rel_times = np.array(rel_times_list)
-
-        resp_rel_list: list[float] = []
-        for r in self.records:
-            mask = sr_times_arr < r.timestamp
-            last_sr = sr_times_arr[mask].max() if mask.any() else 0.0
-            resp_rel_list.append(float(r.timestamp - last_sr))
-
-        resp_rel_times = np.array(resp_rel_list)
+        counted = [
+            r
+            for r in self.records
+            if r.response is not None
+            and (self.response_type is None or r.response == self.response_type)
+        ]
+        resp_rel_times = np.array(
+            [self._time_since_reinforcer(r.timestamp, sr_times) for r in counted]
+        )
 
         bins = np.arange(0, self.interval + bin_size, bin_size)
         bin_centers = (bins[:-1] + bins[1:]) / 2
@@ -60,14 +87,10 @@ class ModelFitAnalyzer:
         opp_counts, _ = np.histogram(rel_times, bins=bins)
         resp_counts, _ = np.histogram(resp_rel_times, bins=bins)
 
-        probs = np.divide(
-            resp_counts,
-            opp_counts,
-            out=np.zeros_like(resp_counts, dtype=float),
-            where=opp_counts != 0,
-        )
+        visited = opp_counts != 0
+        probs = resp_counts[visited] / opp_counts[visited]
 
-        return bin_centers, probs
+        return bin_centers[visited], probs
 
     def fit_and_plot(self, output_path: str):
         import matplotlib.pyplot as plt  # local import

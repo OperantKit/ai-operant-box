@@ -150,7 +150,8 @@ CRF でのステップあたりの往復時間の実測（1 台のマシン、20
 
 - **被験体の I/F。** どの `Subject` でも使える。`act()` は行動名を返し、`operanda` がレバー押しとみなす行動名を操作体のキーに写す。既定は `"Left Lever"` → `"left"`、`"Right Lever"` → `"right"`（LLM 被験体向けの語彙は `CONCURRENT_ACTIONS = ("Left Lever", "Right Lever", "Nothing")`。例: `StreamingLLMSubject(client, actions=CONCURRENT_ACTIONS)`）。それ以外の行動名は反応ではなく、スケジュールには時間の刻みだけが渡る。`learn()` は直前に押したレバーについて `"Food Pellet"` か `None` を受け取る。
 - **記録。** 反応 1 回が `ChoiceRecord(timestamp, operandum, is_reinforced, cod_suppressed)` 1 件になる。
-- **マッチングの当てはめ。** `ai_operant_box.analytics.matching.choice_totals(records, start=...)` は助走の後のレバーごとの反応数と強化数を数え、`fit_generalized_matching(b1, b2, r1, r2)` は条件をまたいで `log(B1/B2) = a * log(R1/R2) + log b`（常用対数; Baum, 1974）を最小二乗で当てはめ、`a`・`log_b`・R² を返す。
+- **マッチングの当てはめ。** `ai_operant_box.analytics.matching.choice_totals(records, start=...)` は助走の後のレバーごとの反応数と強化数を数え、`fit_generalized_matching(b1, b2, r1, r2)` は条件をまたいで `log(B1/B2) = a * log(R1/R2) + log b`（常用対数; Baum, 1974）を最小二乗で当てはめ、`a`・`log_b`・R² を返す。`correction=0.5` は全カウントに 0.5 を足し、空のセルがある短いセッションでも当てはめられるようにする（推定値と一緒に報告すること）。`changeovers(records, start=...)` はレバー間の切替回数を数える。
+- **LLM 被験体。** `CONCURRENT_SYSTEM_PROMPT` は単一レバー用 prompt の 2 レバー版で、行動名とフィードバックだけを伝え、レバーの強化のされ方には触れない。`examples/claude_cli_matching.py --model haiku` は `claude` CLI 経由で Claude のモデルを下の 4 水準で走らせ（条件ごとに新しいセッション、1 秒のステップを 100 回、全体で 3 秒に 1 強化、既定は COD なし）、カウント・切替回数・2 種の当てはめ（セッション全体と後半）を JSON に書く。`--plot <dir>` で当てはめを描く。
 - **参照用の被験体。** `MatchingAgent(sensitivity=s, mean_visit=v)` は毎ステップどちらかのレバーを押し、得た強化子から確率 `R_L^s / (R_L^s + R_R^s)` で左を選び、1 ステップごとに確率 `1/v` でレバーを選び直す。チャンバーと当てはめを確かめるためのもので、生体のモデルではない。
 
 ```bash

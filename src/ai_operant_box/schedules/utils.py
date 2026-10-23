@@ -1,8 +1,9 @@
 """Helpers shared by the variable / random schedule modules.
 
-The Fleshler-Hoffman sequence used here is a Python re-implementation of the
-exponential-distribution approximation; it returns rounded integer values
-whose mean approaches the requested ``mean`` for large ``iterations``.
+Values are drawn independently by inverse-CDF sampling from an exponential
+distribution and rounded to integers; their mean approaches the requested
+``mean`` for large ``iterations``. This is not the Fleshler & Hoffman (1962)
+progression, which is a fixed, deterministic list of intervals.
 
 Reference
 ---------
@@ -17,11 +18,12 @@ import math
 import random
 
 
-def _fleshler_hoffman_sequence(mean: float, iterations: int) -> list[int]:
+def _exponential_sequence(mean: float, iterations: int) -> list[int]:
     """Return ``iterations`` integer ratio/interval values with the given mean.
 
-    Uses inverse-CDF sampling from an exponential distribution. Values are
-    rounded and clamped to a minimum of 1 so they remain valid ratios.
+    Each value is an independent draw ``-mean * ln(1 - u)`` from an
+    exponential distribution (inverse-CDF sampling), rounded and clamped to a
+    minimum of 1 so it remains a valid ratio.
     """
     if mean <= 0 or iterations <= 0:
         raise ValueError("Mean and iterations must be positive.")
@@ -34,4 +36,4 @@ def _fleshler_hoffman_sequence(mean: float, iterations: int) -> list[int]:
     return sequence
 
 
-__all__ = ["_fleshler_hoffman_sequence"]
+__all__ = ["_exponential_sequence"]

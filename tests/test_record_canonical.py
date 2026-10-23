@@ -36,13 +36,16 @@ class TestCumulativeRecorderDelegation:
         records = [_record(0.1), _record(0.2, reinforced=True), _record(0.3)]
         rec = CumulativeRecorder(records)
         out = tmp_path / "single.png"
+        import ai_operant_box.analytics.record as record_mod
+
+        real = record_mod.build_cumulative_record_figure
         with patch(
-            "ai_operant_box.analytics.record.render_cumulative_record"
-        ) as mock_render:
-            mock_render.return_value = True
+            "ai_operant_box.analytics.record.build_cumulative_record_figure",
+            side_effect=real,
+        ) as mock_build:
             rec.save_png(str(out))
-        assert mock_render.called
-        call = mock_render.call_args
+        assert mock_build.called
+        call = mock_build.call_args
         # Positional or kw: response_times and reinforcement_times must be
         # passed with session-relative seconds.
         kwargs = call.kwargs
@@ -61,13 +64,50 @@ class TestCumulativeRecorderDelegation:
         assert out.exists()
         assert out.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
+    def test_save_png_writes_title(self, tmp_path) -> None:
+        records = [_record(0.1), _record(0.2, reinforced=True), _record(0.3)]
+        rec = CumulativeRecorder(records)
+        import ai_operant_box.analytics.record as record_mod
+
+        real = record_mod.build_cumulative_record_figure
+        titles: list = []
+
+        def spy(*args, **kwargs):
+            built = real(*args, **kwargs)
+            fig, main_ax = built[0], built[1]
+            original_clear = fig.clear
+
+            def recording_clear(*a, **kw):
+                texts = [main_ax.get_title()]
+                if fig._suptitle is not None:
+                    texts.append(fig._suptitle.get_text())
+                titles.append(texts)
+                return original_clear(*a, **kw)
+
+            fig.clear = recording_clear
+            return built
+
+        out = tmp_path / "titled.png"
+        with patch(
+            "ai_operant_box.analytics.record.build_cumulative_record_figure",
+            side_effect=spy,
+        ):
+            rec.save_png(str(out), title="CRF, haiku")
+        # One title on the record, replacing the default "Cumulative Record".
+        assert titles == [["CRF, haiku"]]
+
+        from PIL import Image
+
+        with Image.open(out) as img:
+            assert img.info.get("Title") == "CRF, haiku"
+
     def test_empty_records_skip_render(self, tmp_path) -> None:
         rec = CumulativeRecorder([])
         with patch(
-            "ai_operant_box.analytics.record.render_cumulative_record"
-        ) as mock_render:
+            "ai_operant_box.analytics.record.build_cumulative_record_figure"
+        ) as mock_build:
             rec.save_png(str(tmp_path / "empty.png"))
-        assert not mock_render.called
+        assert not mock_build.called
 
 
 @pytest.mark.unit

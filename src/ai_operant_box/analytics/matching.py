@@ -44,6 +44,19 @@ def choice_totals(
     return totals
 
 
+def changeovers(records: Iterable[Any], start: float = float("-inf")) -> int:
+    """Count switches between operanda among responses with ``timestamp >= start``."""
+    count = 0
+    previous: str | None = None
+    for record in records:
+        if record.timestamp < start:
+            continue
+        if previous is not None and record.operandum != previous:
+            count += 1
+        previous = record.operandum
+    return count
+
+
 @dataclass(frozen=True)
 class GeneralizedMatchingFit:
     a: float
@@ -59,15 +72,20 @@ def fit_generalized_matching(
     b2: Sequence[float],
     r1: Sequence[float],
     r2: Sequence[float],
+    correction: float = 0.0,
 ) -> GeneralizedMatchingFit:
     """Least-squares fit of the generalized matching law over conditions.
 
     Each index is one condition. Counts must be positive (a zero makes
-    the log ratio undefined; drop or correct such conditions first), and
-    at least two conditions with distinct reinforcer ratios are needed.
+    the log ratio undefined), and at least two conditions with distinct
+    reinforcer ratios are needed. ``correction`` is added to every count
+    before taking logs (e.g. 0.5) so short sessions with an empty cell
+    can still be fitted; report it with the estimates.
     """
     if not (len(b1) == len(b2) == len(r1) == len(r2)):
         raise ValueError("b1, b2, r1, r2 must have the same length")
+    if correction:
+        b1, b2, r1, r2 = ([v + correction for v in seq] for seq in (b1, b2, r1, r2))
     if len(b1) < 2:
         raise ValueError("at least two conditions are needed")
     for name, values in (("b1", b1), ("b2", b2), ("r1", r1), ("r2", r2)):
@@ -101,6 +119,7 @@ def fit_generalized_matching(
 __all__ = [
     "ChoiceTotals",
     "GeneralizedMatchingFit",
+    "changeovers",
     "choice_totals",
     "fit_generalized_matching",
 ]

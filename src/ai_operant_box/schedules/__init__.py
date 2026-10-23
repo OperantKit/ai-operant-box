@@ -1,6 +1,6 @@
 """Variable / random / interdependent schedule families.
 
-These schedules carry their own state (Fleshler-Hoffman-derived ratios or
+These schedules carry their own state (exponentially distributed ratios or
 intervals, dyadic interdependent windows) and are independent from the
 single-subject :mod:`ai_operant_box.chamber.schedule` module.
 """

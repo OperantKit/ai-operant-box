@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import random
 
-from ai_operant_box.schedules.utils import _fleshler_hoffman_sequence
+from ai_operant_box.schedules.utils import _exponential_sequence
 
 
 class VariableRatioSchedule:
     """VR — reinforce after a variable number of responses.
 
-    The sequence of per-trial ratios is drawn from a Fleshler-Hoffman
-    exponential approximation with mean ``mean_ratio``.
+    The per-trial ratios are independent draws from an exponential
+    distribution with mean ``mean_ratio``, rounded to integers.
     """
 
     def __init__(self, mean_ratio: int, iterations: int = 12) -> None:
@@ -24,7 +24,7 @@ class VariableRatioSchedule:
         self.reinforce_at_response = self.sequence[self.current_sequence_index]
 
     def _generate_sequence(self) -> None:
-        self.sequence = _fleshler_hoffman_sequence(float(self.mean_ratio), self.iterations)
+        self.sequence = _exponential_sequence(float(self.mean_ratio), self.iterations)
         self.current_sequence_index = 0
 
     def decision(self, response_made: bool = True) -> bool:

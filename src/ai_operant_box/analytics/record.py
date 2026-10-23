@@ -18,13 +18,9 @@ from pathlib import Path
 from ai_operant_box.chamber.environment import ResponseRecord
 
 try:
-    from session_analyzer.visualizer import (
-        build_cumulative_record_figure,
-        render_cumulative_record,
-    )
+    from session_analyzer.visualizer import build_cumulative_record_figure
 except ImportError:  # pragma: no cover - optional viz dep
     build_cumulative_record_figure = None  # type: ignore[assignment]
-    render_cumulative_record = None  # type: ignore[assignment]
 
 
 def _ensure_parent(file_path: str) -> None:
@@ -47,7 +43,7 @@ class CumulativeRecorder:
     def save_png(self, file_path: str, title: str = "Cumulative Record") -> None:
         if not self.records:
             return
-        if render_cumulative_record is None:
+        if build_cumulative_record_figure is None:
             raise ImportError(
                 "session_analyzer is required for cumulative-record rendering. "
                 "Install it from apps/analysis/session-analyzer."
@@ -58,12 +54,19 @@ class CumulativeRecorder:
             t for t, r in zip(response_times, self.records) if r.is_reinforced
         ]
 
-        _ensure_parent(file_path)
-        render_cumulative_record(
+        # session_analyzer's renderer takes no title, so build the canonical
+        # figure, replace its default axes title, and store the title in the
+        # PNG metadata.
+        fig, main_ax, _ = build_cumulative_record_figure(
             response_times=response_times,
             reinforcement_times=reinforcement_times,
-            output=Path(file_path),
         )
+        main_ax.set_title(title)
+        _ensure_parent(file_path)
+        try:
+            fig.savefig(Path(file_path), metadata={"Title": title})
+        finally:
+            fig.clear()
 
 
 class MultiSessionRecorder:

@@ -15,21 +15,18 @@ from ai_operant_box.schedules.interval import (
 class TestIntervalSchedules(unittest.TestCase):
 
     def setUp(self):
-        self.mock_monotonic = MagicMock(return_value=0.0)
-        self.patcher = patch("time.monotonic", self.mock_monotonic)
-        self.patcher.start()
-
-    def tearDown(self):
-        self.patcher.stop()
+        # The schedules read the clock passed to them (the chamber's virtual
+        # clock in real use); a mock stands in for it here.
+        self.mock_clock = MagicMock(return_value=0.0)
 
     def test_variable_interval_schedule_initialization(self):
         with self.assertRaises(ValueError):
-            VariableIntervalSchedule(mean_interval=0)
+            VariableIntervalSchedule(mean_interval=0, clock=self.mock_clock)
         with self.assertRaises(ValueError):
-            VariableIntervalSchedule(mean_interval=-5)
+            VariableIntervalSchedule(mean_interval=-5, clock=self.mock_clock)
 
-        self.mock_monotonic.return_value = 100.0
-        schedule = VariableIntervalSchedule(mean_interval=10.0)
+        self.mock_clock.return_value = 100.0
+        schedule = VariableIntervalSchedule(mean_interval=10.0, clock=self.mock_clock)
         self.assertIsInstance(schedule, VariableIntervalSchedule)
         self.assertEqual(schedule.mean_interval, 10.0)
         self.assertEqual(len(schedule.sequence), 12)
@@ -38,15 +35,15 @@ class TestIntervalSchedules(unittest.TestCase):
 
     def test_variable_interval_schedule_reinforcement_delivery(self):
         with patch(
-            "ai_operant_box.schedules.interval._fleshler_hoffman_sequence",
+            "ai_operant_box.schedules.interval._exponential_sequence",
             return_value=[5.0, 10.0, 5.0],
         ):
-            self.mock_monotonic.return_value = 0.0
-            schedule = VariableIntervalSchedule(mean_interval=7.0)
+            self.mock_clock.return_value = 0.0
+            schedule = VariableIntervalSchedule(mean_interval=7.0, clock=self.mock_clock)
 
-            self.mock_monotonic.return_value = 4.0
+            self.mock_clock.return_value = 4.0
             self.assertFalse(schedule.decision(response_made=False))
-            self.mock_monotonic.return_value = 5.0
+            self.mock_clock.return_value = 5.0
             self.assertFalse(
                 schedule.decision(response_made=False),
                 "Should not reinforce without response",
@@ -59,12 +56,12 @@ class TestIntervalSchedules(unittest.TestCase):
             self.assertAlmostEqual(schedule.last_reinforcement_time, 5.0)
             self.assertAlmostEqual(schedule.next_reinforcement_interval, 10.0)
 
-            self.mock_monotonic.return_value = 14.0
+            self.mock_clock.return_value = 14.0
             self.assertFalse(
                 schedule.decision(response_made=True),
                 "Should not reinforce before interval passes",
             )
-            self.mock_monotonic.return_value = 15.0
+            self.mock_clock.return_value = 15.0
             self.assertTrue(
                 schedule.decision(response_made=True),
                 "Should reinforce with response after interval",
@@ -75,18 +72,20 @@ class TestIntervalSchedules(unittest.TestCase):
     def test_variable_interval_schedule_mean_approximation(self):
         mean_interval = 20.0
         with patch(
-            "ai_operant_box.schedules.interval._fleshler_hoffman_sequence",
+            "ai_operant_box.schedules.interval._exponential_sequence",
             side_effect=lambda m, i: [random.expovariate(1 / m) for _ in range(i)],
         ):
-            schedule = VariableIntervalSchedule(mean_interval=mean_interval, iterations=1000)
+            schedule = VariableIntervalSchedule(
+                mean_interval=mean_interval, iterations=1000, clock=self.mock_clock
+            )
             num_reinforcements = 500
             total_time = 0.0
             actual_reinforcements = 0
 
-            self.mock_monotonic.return_value = 0.0
+            self.mock_clock.return_value = 0.0
             for _ in range(num_reinforcements * 2):
                 current_time_step = random.uniform(0.1, 1.0)
-                self.mock_monotonic.return_value += current_time_step
+                self.mock_clock.return_value += current_time_step
                 total_time += current_time_step
 
                 if schedule.decision(response_made=True):
@@ -113,36 +112,36 @@ class TestIntervalSchedules(unittest.TestCase):
         with self.assertRaises(ValueError):
             RandomIntervalSchedule(probability_per_unit_time=1.1)
 
-        schedule = RandomIntervalSchedule(probability_per_unit_time=0.1)
+        schedule = RandomIntervalSchedule(probability_per_unit_time=0.1, clock=self.mock_clock)
         self.assertIsInstance(schedule, RandomIntervalSchedule)
         self.assertEqual(schedule.probability_per_unit_time, 0.1)
-        self.assertAlmostEqual(schedule.last_check_time, self.mock_monotonic.return_value)
+        self.assertAlmostEqual(schedule.last_check_time, self.mock_clock.return_value)
         self.assertFalse(schedule.reinforcement_available)
 
     def test_random_interval_schedule_reinforcement_delivery_deterministic(self):
-        schedule = RandomIntervalSchedule(probability_per_unit_time=0.1)
+        schedule = RandomIntervalSchedule(probability_per_unit_time=0.1, clock=self.mock_clock)
 
-        self.mock_monotonic.return_value = 0.0
+        self.mock_clock.return_value = 0.0
         schedule.last_check_time = 0.0
         schedule.reinforcement_available = False
         with patch("random.random", return_value=0.9):
-            self.mock_monotonic.return_value = 1.0
+            self.mock_clock.return_value = 1.0
             self.assertFalse(schedule.decision(response_made=False))
             self.assertFalse(schedule.reinforcement_available)
 
-        self.mock_monotonic.return_value = 0.0
+        self.mock_clock.return_value = 0.0
         schedule.last_check_time = 0.0
         schedule.reinforcement_available = False
         with patch("random.random", return_value=0.05):
-            self.mock_monotonic.return_value = 1.0
+            self.mock_clock.return_value = 1.0
             self.assertFalse(schedule.decision(response_made=False))
             self.assertTrue(schedule.reinforcement_available)
 
-        self.mock_monotonic.return_value = 0.0
+        self.mock_clock.return_value = 0.0
         schedule.last_check_time = 0.0
         schedule.reinforcement_available = True
         with patch("random.random", return_value=0.9):
-            self.mock_monotonic.return_value = 1.0
+            self.mock_clock.return_value = 1.0
             self.assertTrue(schedule.decision(response_made=True))
             self.assertFalse(schedule.reinforcement_available)
 

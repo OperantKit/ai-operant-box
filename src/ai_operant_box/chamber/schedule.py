@@ -23,6 +23,13 @@ class ContinuousReinforcement(ReinforcementSchedule):
         return response == self.target_response
 
 
+class Extinction(ReinforcementSchedule):
+    """EXT — no response is reinforced."""
+
+    def is_reinforced(self, response: str, current_time: float) -> bool:
+        return False
+
+
 class FixedInterval(ReinforcementSchedule):
     """FI — first target response after ``interval`` seconds is reinforced."""
 
@@ -40,4 +47,4 @@ class FixedInterval(ReinforcementSchedule):
         return False
 
 
-__all__ = ["ContinuousReinforcement", "FixedInterval", "ReinforcementSchedule"]
+__all__ = ["ContinuousReinforcement", "Extinction", "FixedInterval", "ReinforcementSchedule"]

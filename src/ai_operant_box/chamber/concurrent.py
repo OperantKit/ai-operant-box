@@ -39,6 +39,19 @@ CONCURRENT_ACTIONS: tuple[str, ...] = ("Left Lever", "Right Lever", "Nothing")
 
 DEFAULT_OPERANDA: dict[str, str] = {"Left Lever": "left", "Right Lever": "right"}
 
+# Two-lever counterpart of ``llm_agent.SYSTEM_PROMPT``. It names the
+# actions and the feedback only; it says nothing about how the levers pay
+# off, so any preference has to come from the obtained reinforcers.
+CONCURRENT_SYSTEM_PROMPT = (
+    "You are a virtual organism in a controlled experimental chamber (Operant Box) "
+    "with two levers. "
+    "Your goal is to interact with the environment to obtain rewards. "
+    "You will be presented with a stimulus (SD), and you must respond with a single action. "
+    "Available actions: ['Left Lever', 'Right Lever', 'Nothing']. "
+    "After each action, you will receive feedback (Reinforcer) indicating if you received a reward. "
+    "Respond ONLY with the action name."
+)
+
 
 @dataclass
 class ChoiceRecord:
@@ -155,6 +168,7 @@ class ConcurrentBox:
 
 __all__ = [
     "CONCURRENT_ACTIONS",
+    "CONCURRENT_SYSTEM_PROMPT",
     "DEFAULT_OPERANDA",
     "ChoiceRecord",
     "ConcurrentBox",
