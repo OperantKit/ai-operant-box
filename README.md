@@ -10,22 +10,25 @@ ai-operant-box puts a large language model (LLM), or a simple numerical agent, i
 
 ## Installation
 
+
 Python 3.11 or newer. ai-operant-box is not on PyPI yet; install it from GitHub. The core needs only NumPy and runs the numerical agents, the single-lever chamber, and the example below:
 
 ```bash
 pip install git+https://github.com/OperantKit/ai-operant-box
 ```
 
-Cumulative records, the scallop fit, OKL logs, and the two-lever chamber use other OperantKit packages, which are not on PyPI either. Install them from GitHub without dependency resolution, then add the third-party libraries:
+Cumulative records, the scallop fit, OKL logs, and the two-lever chamber use other OperantKit packages, which are not on PyPI either. Install them from GitHub together; Matplotlib and SciPy come with session-analyzer:
 
 ```bash
-G=git+https://github.com/OperantKit
-pip install --no-deps $G/contingency-dsl-py $G/contingency-py $G/experiment-core \
-  $G/session-recorder $G/session-analyzer
-pip install matplotlib scipy
+# Until the PyPI release, install from GitHub together with its OperantKit dependencies.
+pip install git+https://github.com/OperantKit/contingency-dsl-py \
+            git+https://github.com/OperantKit/contingency-py \
+            git+https://github.com/OperantKit/experiment-core \
+            git+https://github.com/OperantKit/session-recorder \
+            git+https://github.com/OperantKit/session-analyzer
 ```
 
-pip reports version conflicts between these development builds; they do not affect this package. A Claude model as the subject needs either the `claude` command (Claude Code, logged in) or `pip install anthropic` and `ANTHROPIC_API_KEY`.
+A Claude model as the subject needs either the `claude` command (Claude Code, logged in) or `pip install anthropic` and `ANTHROPIC_API_KEY`.
 
 ## 30-second example
 

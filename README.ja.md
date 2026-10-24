@@ -10,22 +10,25 @@ ai-operant-box は、大規模言語モデル（LLM）や単純な数値エー�
 
 ## インストール
 
+
 Python 3.11 以上。ai-operant-box はまだ PyPI に公開されていないので、GitHub から入れます。本体が依存するのは NumPy だけで、数値エージェント、単一レバーの実験箱、下の例が動きます。
 
 ```bash
 pip install git+https://github.com/OperantKit/ai-operant-box
 ```
 
-累積記録、スキャロップの当てはめ、OKL ログ、2 本レバーの実験箱は他の OperantKit パッケージを使います。これらも PyPI に無いので、依存の解決を止めて GitHub から入れ、外部ライブラリを足します。
+累積記録、スキャロップの当てはめ、OKL ログ、2 本レバーの実験箱は他の OperantKit パッケージを使います。これらも PyPI に無いので、一緒に GitHub から入れます。Matplotlib と SciPy は session-analyzer と一緒に入ります。
 
 ```bash
-G=git+https://github.com/OperantKit
-pip install --no-deps $G/contingency-dsl-py $G/contingency-py $G/experiment-core \
-  $G/session-recorder $G/session-analyzer
-pip install matplotlib scipy
+# PyPI に公開されるまでは、OperantKit の依存と一緒に GitHub から入れる。
+pip install git+https://github.com/OperantKit/contingency-dsl-py \
+            git+https://github.com/OperantKit/contingency-py \
+            git+https://github.com/OperantKit/experiment-core \
+            git+https://github.com/OperantKit/session-recorder \
+            git+https://github.com/OperantKit/session-analyzer
 ```
 
-pip はこれら開発版どうしの版の食い違いを報告しますが、このパッケージには影響しません。Claude のモデルを被験体にするには、`claude` コマンド（ログイン済みの Claude Code）か、`pip install anthropic` と `ANTHROPIC_API_KEY` のどちらかが要ります。
+Claude のモデルを被験体にするには、`claude` コマンド（ログイン済みの Claude Code）か、`pip install anthropic` と `ANTHROPIC_API_KEY` のどちらかが要ります。
 
 ## 30 秒で動く例
 
