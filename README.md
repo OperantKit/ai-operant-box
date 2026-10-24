@@ -72,11 +72,11 @@ Responding is rare early in each interval and rises toward the end (the FI scall
 | Part | Contents |
 |---|---|
 | Subjects (`ai_operant_box.agent`) | The `Subject` interface (`sense(SD)`, `act() -> R`, `learn(SR)`); numerical agents (`ScallopingAgent`, `BernoulliAgent`, `InductionAgent` after Baum & Grace, 2020, `MatchingAgent`); LLM subjects through the Anthropic API, the `claude` command, or a local GGUF model |
-| Chambers (`ai_operant_box.chamber`) | `OperantBox` (one lever), `ConcurrentBox` (two levers, concurrent VI VI with a changeover delay, using contingency-py), `LeaderFollowerBox` (two subjects on an interdependent schedule; Benvenuti et al., 2024) |
+| Chambers (`ai_operant_box.chamber`) | `OperantBox` (one lever; also takes a contingency-py schedule and reads punishers in its outcomes, e.g. `Overlay`), `ConcurrentBox` (two levers, concurrent VI VI with a changeover delay, using contingency-py), `LeaderFollowerBox` (two subjects on an interdependent schedule; Benvenuti et al., 2024) |
 | Schedules | CRF, EXT, FI, DRL, VI, VR, RI, RR, and a dyadic interdependent schedule |
 | Analytics (`ai_operant_box.analytics`) | Cumulative records, the FI scallop fit `P(R \| t) = min(1, k * t**2)`, FI pattern measures (quarter life, index of curvature), and the generalized matching law fit |
 | OKL output | `async_simulator.canonical_sink.mirror_events_to_sink` passes the events to a [session-recorder](https://github.com/OperantKit/session-recorder) sink |
-| Examples (`examples/`) | Claude subjects on CRF, CRF then extinction, FI, DRL, concurrent VI VI, yoked reinforcement, and a two-subject schedule; numerical subjects on concurrent VI VI; a local model on FI |
+| Examples (`examples/`) | Claude subjects on CRF, CRF then extinction, FI, DRL, VI with and without punishment, concurrent VI VI, yoked reinforcement, and a two-subject schedule; numerical subjects on concurrent VI VI; a local model on FI |
 
 How to run an LLM as the subject, with measured time per step: [docs/en/llm-subjects.md](docs/en/llm-subjects.md). The two-lever chamber and the matching-law fit: [docs/en/concurrent-matching.md](docs/en/concurrent-matching.md).
 
