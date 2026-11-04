@@ -6,6 +6,12 @@ from ai_operant_box.chamber.interdependent import (
     LeaderFollowerBox,
     SocialEvent,
 )
+from ai_operant_box.chamber.mts import (
+    MatchingToSampleBox,
+    MatchingToSampleSubject,
+    TrialOutcome,
+    TrialRecord,
+)
 from ai_operant_box.chamber.schedule import (
     ContinuousReinforcement,
     DifferentialReinforcementOfLowRate,
@@ -21,9 +27,13 @@ __all__ = [
     "FixedInterval",
     "InterdependentSchedule",
     "LeaderFollowerBox",
+    "MatchingToSampleBox",
+    "MatchingToSampleSubject",
     "OperantBox",
     "ReinforcementSchedule",
     "ResponseRecord",
     "SocialEvent",
+    "TrialOutcome",
+    "TrialRecord",
     "VirtualClock",
 ]

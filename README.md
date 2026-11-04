@@ -72,11 +72,11 @@ Responding is rare early in each interval and rises toward the end (the FI scall
 | Part | Contents |
 |---|---|
 | Subjects (`ai_operant_box.agent`) | The `Subject` interface (`sense(SD)`, `act() -> R`, `learn(SR)`); numerical agents (`ScallopingAgent`, `BernoulliAgent`, `InductionAgent` after Baum & Grace, 2020, `MatchingAgent`); LLM subjects through the Anthropic API, the `claude` command, or a local GGUF model |
-| Chambers (`ai_operant_box.chamber`) | `OperantBox` (one lever; also takes a contingency-py schedule and reads punishers in its outcomes, e.g. `Overlay`), `ConcurrentBox` (two levers, concurrent VI VI with a changeover delay, using contingency-py), `LeaderFollowerBox` (two subjects on an interdependent schedule; Benvenuti et al., 2024) |
+| Chambers (`ai_operant_box.chamber`) | `OperantBox` (one lever; also takes a contingency-py schedule and reads punishers in its outcomes, e.g. `Overlay`), `ConcurrentBox` (two levers, concurrent VI VI with a changeover delay, using contingency-py), `LeaderFollowerBox` (two subjects on an interdependent schedule; Benvenuti et al., 2024), `MatchingToSampleBox` (one conversation turn per trial, on contingency-py's `MatchingToSample`) |
 | Schedules | CRF, EXT, FI, DRL, VI, VR, RI, RR, and a dyadic interdependent schedule |
 | Analytics (`ai_operant_box.analytics`) | Cumulative records, the FI scallop fit `P(R \| t) = min(1, k * t**2)`, FI pattern measures (quarter life, index of curvature), and the generalized matching law fit |
 | OKL output | `async_simulator.canonical_sink.mirror_events_to_sink` passes the events to a [session-recorder](https://github.com/OperantKit/session-recorder) sink |
-| Examples (`examples/`) | Claude subjects on CRF, CRF then extinction, FI, DRL, VI with and without punishment, concurrent VI VI, yoked reinforcement, and a two-subject schedule; numerical subjects on concurrent VI VI; a local model on FI |
+| Examples (`examples/`) | Claude subjects on CRF, CRF then extinction, FI, DRL, VI with and without punishment, concurrent VI VI, yoked reinforcement, a two-subject schedule, and a stimulus-equivalence test (Sidman & Tailby, 1982); numerical subjects on concurrent VI VI; a local model on FI |
 
 How to run an LLM as the subject, with measured time per step: [docs/en/llm-subjects.md](docs/en/llm-subjects.md). The two-lever chamber and the matching-law fit: [docs/en/concurrent-matching.md](docs/en/concurrent-matching.md).
 
@@ -109,6 +109,7 @@ The anthropic SDK and the `claude` command are not needed for the tests; the one
 
 - Baum, W. M., & Grace, R. C. (2020). Matching theory and induction explain operant performance. *Journal of the Experimental Analysis of Behavior, 113*(2), 390–418. https://doi.org/10.1002/jeab.583
 - Benvenuti, M. F., Bernardy, J. L., de Toledo, T. F. N., Santiago, J., Siqueira, J. de O., & Silveira, P. S. P. (2024). The role of schedules of reinforcement in the experimental analysis of social behavior. *Perspectives on Behavior Science, 47*(4), 717–738. https://doi.org/10.1007/s40614-024-00421-5
+- Sidman, M., & Tailby, W. (1982). Conditional discrimination vs. matching to sample: An expansion of the testing paradigm. *Journal of the Experimental Analysis of Behavior, 37*(1), 5-22. https://doi.org/10.1901/jeab.1982.37-5
 - Skinner, B. F. (1938). *The behavior of organisms: An experimental analysis*. Appleton-Century.
 
 ## License

@@ -72,11 +72,11 @@ print(bins)
 | 部品 | 中身 |
 |---|---|
 | 被験体（`ai_operant_box.agent`） | `Subject` の I/F（`sense(SD)`、`act() -> R`、`learn(SR)`）。数値エージェント（`ScallopingAgent`、`BernoulliAgent`、Baum & Grace, 2020 に基づく `InductionAgent`、`MatchingAgent`）。Anthropic API・`claude` コマンド・手元の GGUF モデルを通した LLM の被験体 |
-| 実験箱（`ai_operant_box.chamber`） | `OperantBox`（レバー 1 本。contingency-py のスケジュールも受け、`Overlay` などの outcome の罰を読み分ける）、`ConcurrentBox`（レバー 2 本。contingency-py を使った切替遅延付きの並立 VI VI）、`LeaderFollowerBox`（相互依存スケジュールの下の 2 個体。Benvenuti et al., 2024） |
+| 実験箱（`ai_operant_box.chamber`） | `OperantBox`（レバー 1 本。contingency-py のスケジュールも受け、`Overlay` などの outcome の罰を読み分ける）、`ConcurrentBox`（レバー 2 本。contingency-py を使った切替遅延付きの並立 VI VI）、`LeaderFollowerBox`（相互依存スケジュールの下の 2 個体。Benvenuti et al., 2024）、`MatchingToSampleBox`（会話の 1 往復が 1 試行。contingency-py の `MatchingToSample` を使う） |
 | スケジュール | CRF、EXT、FI、DRL、VI、VR、RI、RR、2 個体の相互依存スケジュール |
 | 解析（`ai_operant_box.analytics`） | 累積記録、FI スキャロップの当てはめ `P(R \| t) = min(1, k * t**2)`、FI のパタンの指標（quarter life、曲率指数）、一般化マッチング法則の当てはめ |
 | OKL への出力 | `async_simulator.canonical_sink.mirror_events_to_sink` がイベントを [session-recorder](https://github.com/OperantKit/session-recorder) の書き出し先に渡す |
-| 例（`examples/`） | Claude の被験体で CRF、CRF の後の消去、FI、DRL、罰の有無を切り替える VI、並立 VI VI、ヨークト強化、2 個体のスケジュール。数値の被験体で並立 VI VI。手元のモデルで FI |
+| 例（`examples/`） | Claude の被験体で CRF、CRF の後の消去、FI、DRL、罰の有無を切り替える VI、並立 VI VI、ヨークト強化、2 個体のスケジュール、刺激等価性の試験（Sidman & Tailby, 1982）。数値の被験体で並立 VI VI。手元のモデルで FI |
 
 LLM を被験体として走らせる方法と、ステップあたりの実測時間: [docs/ja/llm-subjects.md](docs/ja/llm-subjects.md)。2 本レバーの実験箱とマッチング法則の当てはめ: [docs/ja/concurrent-matching.md](docs/ja/concurrent-matching.md)。
 
@@ -109,6 +109,7 @@ G=git+https://github.com/OperantKit
 
 - Baum, W. M., & Grace, R. C. (2020). Matching theory and induction explain operant performance. *Journal of the Experimental Analysis of Behavior, 113*(2), 390–418. https://doi.org/10.1002/jeab.583
 - Benvenuti, M. F., Bernardy, J. L., de Toledo, T. F. N., Santiago, J., Siqueira, J. de O., & Silveira, P. S. P. (2024). The role of schedules of reinforcement in the experimental analysis of social behavior. *Perspectives on Behavior Science, 47*(4), 717–738. https://doi.org/10.1007/s40614-024-00421-5
+- Sidman, M., & Tailby, W. (1982). Conditional discrimination vs. matching to sample: An expansion of the testing paradigm. *Journal of the Experimental Analysis of Behavior, 37*(1), 5-22. https://doi.org/10.1901/jeab.1982.37-5
 - Skinner, B. F. (1938). *The behavior of organisms: An experimental analysis*. Appleton-Century.
 
 ## ライセンス
