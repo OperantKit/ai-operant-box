@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from types import ModuleType
 
@@ -165,3 +166,145 @@ def test_write_tables_collects_every_seed_file_in_the_directory(tmp_path: Path) 
     assert "trials" not in summary["seeds"][0]
     assert summary["derived"] == {"BA": 2, "CB": 2, "AC": 2, "CA": 2}
     assert (tmp_path / "table.md").read_text().count("| X-sym | BA |") == 2
+
+
+def _word_stages() -> tuple:
+    return eq.build_stages(eq.STIMULUS_SETS["words"], pretest=True)
+
+
+def test_default_stages_are_the_nonsense_procedure_with_the_same_trial_order() -> None:
+    assert eq.build_stages(eq.STIMULUS_SETS["nonsense"]) == eq.STAGES
+    assert [s.seed_offset for s in eq.STAGES] == [0, 1, 2, 3, 4, 5]
+
+
+def test_word_classes_are_red_apple_rouge_blue_sky_bleu_green_leaf_vert() -> None:
+    words = eq.STIMULUS_SETS["words"]
+    classes = [tuple(words[name][k] for name in "ABC") for k in range(3)]
+    assert classes == [("red", "apple", "rouge"), ("blue", "sky", "bleu"), ("green", "leaf", "vert")]
+
+
+def test_pretest_has_five_probes_per_type_without_consequences_before_training() -> None:
+    client = OracleClient()
+    run = eq.run_experiment(client, seed=0, stages=_word_stages())
+    assert run["status"] == "completed"
+    assert [s["stage"] for s in run["stages"]][:2] == ["Pre", "T-AB"]
+    pre = [t for t in run["trials"] if t["stage"] == "Pre"]
+    assert len(pre) == 60 and all(t["probe"] for t in pre)
+    assert Counter((t["sample"], t["correct"]) for t in pre).most_common()[-1][1] == 5
+    assert len({(t["sample"], t["correct"]) for t in pre}) == 12
+    assert not any(t["reinforced"] for t in pre)
+    assert not any("Result:" in text for text in client.sent[:61])
+    assert pre[-1]["points"] == 0
+    assert run["stages"][0]["block_correct"] == [60]
+
+
+def test_pretest_is_scored_per_relation_apart_from_the_tests() -> None:
+    run = eq.run_experiment(OracleClient(wrong_on={("A", "C")}), seed=1, stages=_word_stages())
+    by = {r["relation"]: r for r in run["pretest"]["relations"]}
+    assert {k: (r["correct"], r["n"]) for k, r in by.items()} == {
+        "BA": (15, 15), "CB": (15, 15), "AC": (0, 15), "CA": (15, 15)}
+    assert by["BA"]["verdict"] == "derived" and by["AC"]["verdict"] == "chance"
+    assert [t["stage"] for t in run["tests"]] == ["X-sym", "X-tr"]
+
+
+def test_pretest_rows_appear_in_the_table_and_stay_out_of_the_derived_count(tmp_path: Path) -> None:
+    run = eq.run_experiment(OracleClient(), seed=0, stages=_word_stages())
+    assert "| 0 | Pre | BA | 15/15 | derived |" in eq.render_table([run])
+    eq.save_json(tmp_path / "seed0.json", run)
+    eq.write_tables(tmp_path)
+    assert json.loads((tmp_path / "summary.json").read_text())["derived"]["BA"] == 1
+
+
+def test_training_trial_order_does_not_shift_when_a_pretest_comes_first() -> None:
+    def order(stages: tuple, name: str) -> list[int]:
+        trials = eq.run_experiment(OracleClient(), seed=2, stages=stages)["trials"]
+        k = {s: i for members in eq.STIMULUS_SETS.values() for s, i in
+             ((m, v.index(m)) for v in members.values() for m in v)}
+        return [k[t["sample"]] for t in trials if t["stage"] == name]
+
+    plain = eq.build_stages(eq.STIMULUS_SETS["words"])
+    assert order(_word_stages(), "X-tr") == order(plain, "X-tr") == order(eq.STAGES, "X-tr")
+
+
+def test_skip_training_runs_only_the_two_tests_with_180_trials_and_no_notice() -> None:
+    client = OracleClient()
+    stages = eq.build_stages(eq.STIMULUS_SETS["nonsense"], skip_training=True)
+    run = eq.run_experiment(client, seed=0, stages=stages)
+    assert [s["stage"] for s in run["stages"]] == ["X-sym", "X-tr"]
+    assert len(client.sent) == 180
+    assert sum(t["probe"] for t in run["trials"]) == 120
+    assert not any(eq.LEAN_INSTRUCTION in text for text in client.sent)
+    assert "pretest" not in run
+
+
+def test_skip_training_keeps_the_trial_order_of_the_same_seed_in_the_full_procedure() -> None:
+    def tests_of(stages: tuple) -> list[str]:
+        trials = eq.run_experiment(OracleClient(), seed=1, stages=stages)["trials"]
+        return [t["sample"] for t in trials if t["stage"] in ("X-sym", "X-tr")]
+
+    skip = eq.build_stages(eq.STIMULUS_SETS["nonsense"], skip_training=True)
+    assert tests_of(skip) == tests_of(eq.STAGES)
+
+
+def test_stage_list_for_the_command_line_flags() -> None:
+    assert eq.stages_for("nonsense", skip_training=False) == eq.STAGES
+    assert eq.stages_for("words", skip_training=False)[0].name == "Pre"
+    assert [s.name for s in eq.stages_for("nonsense", skip_training=True)] == ["X-sym", "X-tr"]
+
+
+class _OneShot:
+    """A one-turn process: answers from the transcript's last sample and reports its cost."""
+
+    instances: list[_OneShot] = []
+
+    def __init__(self) -> None:
+        self.closed = False
+        self.oracle = OracleClient()
+        self.transcript = ""
+        self.last_result = {"total_cost_usd": 0.5}
+        _OneShot.instances.append(self)
+
+    def __enter__(self) -> _OneShot:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.closed = True
+
+    def send(self, text: str) -> str:
+        self.transcript = text
+        return self.oracle.send(text.rsplit("[user] ", 1)[1])
+
+
+def test_windowed_client_sends_only_the_last_exchanges_each_in_a_new_process() -> None:
+    _OneShot.instances = []
+    history = [("Sample: ZIB", "1"), ("Sample: VOK", "2"), ("Sample: MEF", "3")]
+    client = eq.WindowedClient(_OneShot, window=2, history=history)
+    text = "Sample: ZIB\nComparisons: 1) DAQ  2) TUJ  3) PEV\nChoose 1, 2 or 3."
+    assert client.send(text) == "1"
+    assert _OneShot.instances[0].transcript == "\n".join([
+        "[user] Sample: VOK", "[assistant] 2", "[user] Sample: MEF", "[assistant] 3", f"[user] {text}"])
+    client.send(text)
+    second = _OneShot.instances[1].transcript
+    assert "Sample: VOK" not in second and second.count("[assistant]") == 2
+    assert all(one.closed for one in _OneShot.instances)
+    assert len(client.latencies) == 2
+    assert client.last_result["total_cost_usd"] == pytest.approx(1.0)
+
+
+def test_history_from_a_run_rebuilds_what_the_subject_saw() -> None:
+    client = OracleClient()
+    stages = eq.build_stages(eq.STIMULUS_SETS["nonsense"], skip_training=True)
+    run = eq.run_experiment(client, seed=0, stages=stages)
+    tail = [i for i, t in enumerate(run["trials"]) if t["stage"] == "X-sym"][-30:]
+    rebuilt = eq.history_from_run(run, "X-sym", 30)
+    assert [text for text, _ in rebuilt] == [client.sent[i] for i in tail]
+    assert [reply for _, reply in rebuilt] == [run["trials"][i]["raw"] for i in tail]
+
+
+def test_a_continued_run_keeps_the_points_and_opens_with_the_pending_result_line() -> None:
+    client = OracleClient()
+    only = eq.STAGES[-1:]
+    run = eq.run_experiment(client, seed=0, stages=only, start_points=150, first_lines=("Result: No point. Points: 150",))
+    assert client.sent[0].startswith("Result: No point. Points: 150\nSample: ")
+    assert run["trials"][0]["points"] >= 150
+    assert [s["stage"] for s in run["stages"]] == ["X-tr"]
