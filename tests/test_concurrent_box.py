@@ -19,6 +19,7 @@ from ai_operant_box.chamber.concurrent import (  # noqa: E402
     CONCURRENT_ACTIONS,
     ChoiceRecord,
     ConcurrentBox,
+    concurrent_fr_fr,
     concurrent_vi_vi,
 )
 
@@ -200,3 +201,33 @@ def test_matching_agent_keeps_its_lever_within_a_visit():
     assert all(agent.act() == first for _ in range(50))
     with pytest.raises(ValueError):
         MatchingAgent(mean_visit=0.5)
+
+
+def test_consequences_label_reaches_learn():
+    subject = ScriptedSubject(["Left Lever", "Right Lever", "Nothing"])
+    box = ConcurrentBox(
+        subject,
+        concurrent_fr_fr(),
+        consequences={"left": "point", "right": "pellet"},
+    )
+    box.run(3.0)
+    assert subject.received == ["point", "pellet", None]
+
+
+def test_default_consequence_is_food_pellet():
+    subject = ScriptedSubject(["Left Lever"])
+    ConcurrentBox(subject, concurrent_fr_fr()).run(1.0)
+    assert subject.received == ["Food Pellet"]
+
+
+def test_concurrent_fr_fr_counts_each_operandum_without_cod():
+    subject = ScriptedSubject(["Left Lever", "Right Lever", "Left Lever", "Right Lever"])
+    box = ConcurrentBox(subject, concurrent_fr_fr(left=2, right=1))
+    box.run(4.0)
+    assert [r.is_reinforced for r in box.records] == [False, True, True, True]
+    assert not any(r.cod_suppressed for r in box.records)
+
+
+def test_consequences_must_name_components():
+    with pytest.raises(ValueError, match="consequences"):
+        ConcurrentBox(ScriptedSubject([]), concurrent_fr_fr(), consequences={"middle": "point"})

@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from ai_operant_box.agent.llm_agent import LLMSubject
+from ai_operant_box.agent.llm_agent import (
+    NEUTRAL_FEEDBACK_SENTENCE,
+    SYSTEM_PROMPT,
+    LLMSubject,
+    ResultText,
+    StreamingLLMSubject,
+    build_system_prompt,
+)
 
 
 class MockClient:
@@ -128,3 +135,108 @@ def test_summary_only_replaces_trials_with_counts_in_system():
     )
     # the stored system prompt is not modified
     assert subject.system_prompt == "base"
+
+
+class SendClient:
+    """Resident-conversation fake: records every turn and always presses."""
+
+    def __init__(self) -> None:
+        self.turns: list[str] = []
+
+    def send(self, text: str) -> str:
+        self.turns.append(text)
+        return "Lever Press"
+
+
+def _two_steps(subject, consequences=("Food Pellet", None, None)) -> None:
+    for sr in consequences:
+        subject.sense("Light ON")
+        subject.act()
+        subject.learn(sr)
+    subject.sense("Light ON")
+    subject.act()
+
+
+def _result_lines(client: MockClient) -> list[str]:
+    contents = [m["content"] for m in client.calls[-1]["messages"]]
+    return [c for c in contents if not c.startswith("Stimulus:") and c != "Lever Press"]
+
+
+def test_default_result_text_keeps_the_two_current_sentences():
+    client = MockClient()
+    _two_steps(LLMSubject(api_client=client), consequences=("Food Pellet", None))
+    assert _result_lines(client) == ["Result: Reward", "Result: No Reward"]
+
+    send = SendClient()
+    _two_steps(StreamingLLMSubject(send), consequences=("Food Pellet", None))
+    assert send.turns == [
+        "Stimulus: Light ON",
+        "Result: Reward\nStimulus: Light ON",
+        "Result: No Reward\nStimulus: Light ON",
+    ]
+
+
+def test_given_result_text_is_sent():
+    text = ResultText(reinforced="Result: Correct.", unreinforced="Result: Nothing happened.")
+    client = MockClient()
+    _two_steps(LLMSubject(api_client=client, result_text=text), consequences=("Food Pellet", None))
+    assert _result_lines(client) == ["Result: Correct.", "Result: Nothing happened."]
+
+    send = SendClient()
+    _two_steps(StreamingLLMSubject(send, result_text=text), consequences=("Food Pellet", None))
+    assert send.turns[1:] == [
+        "Result: Correct.\nStimulus: Light ON",
+        "Result: Nothing happened.\nStimulus: Light ON",
+    ]
+
+
+def test_none_result_line_is_not_sent():
+    text = ResultText(reinforced="Result: Correct.", unreinforced=None)
+    client = MockClient()
+    _two_steps(LLMSubject(api_client=client, result_text=text), consequences=("Food Pellet", None))
+    assert _result_lines(client) == ["Result: Correct."]
+
+    send = SendClient()
+    _two_steps(StreamingLLMSubject(send, result_text=text), consequences=(None, "Food Pellet"))
+    assert send.turns[1:] == ["Stimulus: Light ON", "Result: Correct.\nStimulus: Light ON"]
+
+
+def test_by_label_picks_the_line_of_the_reinforcer_label():
+    text = ResultText(by_label={"point": "Result: +1 point.", "silent": None})
+    assert text.line("point") == "Result: +1 point."
+    assert text.line("silent") is None
+    assert text.line("Food Pellet") == "Result: Reward"
+    assert text.line(None) == "Result: No Reward"
+
+
+def test_build_system_prompt_default_equals_system_prompt():
+    assert build_system_prompt() == SYSTEM_PROMPT
+
+
+def test_build_system_prompt_replaces_or_drops_sentences():
+    prompt = build_system_prompt(
+        goal_sentence=None,
+        feedback_sentence=NEUTRAL_FEEDBACK_SENTENCE,
+        actions=("Left", "Nothing"),
+    )
+    assert "rewards" not in prompt
+    assert NEUTRAL_FEEDBACK_SENTENCE in prompt
+    assert "Available actions: ['Left', 'Nothing']. " in prompt
+
+
+def test_preamble_goes_only_at_the_head_of_the_first_message():
+    send = SendClient()
+    _two_steps(StreamingLLMSubject(send, preamble="Session 1."), consequences=("Food Pellet",))
+    assert send.turns == [
+        "Session 1.\nStimulus: Light ON",
+        "Result: Reward\nStimulus: Light ON",
+    ]
+
+
+def test_summary_only_ignores_result_text():
+    text = ResultText(reinforced="Result: Correct.", unreinforced=None)
+    client = MockClient()
+    subject = LLMSubject(api_client=client, summary_only=True, result_text=text)
+    _two_steps(subject, consequences=("Food Pellet",))
+    assert "1 rewards received" in client.calls[-1]["system"]
+    assert client.calls[-1]["messages"] == [{"role": "user", "content": "Stimulus: Light ON"}]

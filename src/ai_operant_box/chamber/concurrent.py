@@ -89,6 +89,17 @@ def concurrent_vi_vi(
     )
 
 
+def concurrent_fr_fr(left: int = 1, right: int = 1) -> Any:
+    """Build ``Conc FR left FR right`` with no COD (contingency-py).
+
+    Operandum keys are ``"left"`` and ``"right"``.
+    """
+    from contingency.schedules.concurrent import Concurrent
+    from contingency.schedules.ratio import FR
+
+    return Concurrent({"left": FR(left), "right": FR(right)}, cod=0.0)
+
+
 class ConcurrentBox:
     """Discrete-time chamber with two (or more) operanda.
 
@@ -104,6 +115,9 @@ class ConcurrentBox:
         As in :class:`OperantBox`. Defaults to a fresh :class:`VirtualClock`.
     operanda : mapping, optional
         Action label -> operandum key of ``schedule``.
+    consequences : mapping, optional
+        Operandum key -> the label ``learn`` receives on reinforcement.
+        Keys left out get ``"Food Pellet"``.
     """
 
     def __init__(
@@ -112,6 +126,7 @@ class ConcurrentBox:
         schedule: Any,
         clock: Callable[[], float] | None = None,
         operanda: Mapping[str, str] | None = None,
+        consequences: Mapping[str, str] | None = None,
     ) -> None:
         self.subject = subject
         self.schedule = schedule
@@ -124,6 +139,12 @@ class ConcurrentBox:
                 raise ValueError(
                     f"operanda {unknown!r} are not components of the schedule ({sorted(known)!r})"
                 )
+            unknown = sorted(set(consequences or ()) - set(known))
+            if unknown:
+                raise ValueError(
+                    f"consequences {unknown!r} are not components of the schedule ({sorted(known)!r})"
+                )
+        self.consequences: dict[str, str] = dict(consequences or {})
         self.records: list[ChoiceRecord] = []
         self.current_sd: Any = "Light ON"
 
@@ -151,7 +172,9 @@ class ConcurrentBox:
 
         outcome = self.schedule.step(now, ResponseEvent(time=now, operandum=operandum))
         is_reinforced = bool(outcome.reinforced)
-        self.subject.learn("Food Pellet" if is_reinforced else None)
+        self.subject.learn(
+            self.consequences.get(operandum, "Food Pellet") if is_reinforced else None
+        )
         record = ChoiceRecord(
             timestamp=now,
             operandum=operandum,
@@ -172,5 +195,6 @@ __all__ = [
     "DEFAULT_OPERANDA",
     "ChoiceRecord",
     "ConcurrentBox",
+    "concurrent_fr_fr",
     "concurrent_vi_vi",
 ]

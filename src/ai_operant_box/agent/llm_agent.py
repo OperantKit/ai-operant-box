@@ -22,7 +22,8 @@ imported lazily by callers.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
 from ai_operant_box.agent.base import Subject
@@ -38,6 +39,52 @@ SYSTEM_PROMPT = (
     "Respond ONLY with the action name."
 )
 
+NEUTRAL_FEEDBACK_SENTENCE = "After each action, a result line may or may not follow. "
+
+
+def build_system_prompt(
+    *,
+    goal_sentence: str | None = "Your goal is to interact with the environment to obtain rewards. ",
+    feedback_sentence: str | None = (
+        "After each action, you will receive feedback (Reinforcer) indicating if you received a reward. "
+    ),
+    actions: Sequence[str] = ACTIONS,
+) -> str:
+    """The system prompt with its goal and feedback sentences replaced or dropped.
+
+    With the default arguments the result equals :data:`SYSTEM_PROMPT`. ``None``
+    drops a sentence. Each sentence carries its own trailing space.
+    """
+    return (
+        "You are a virtual organism in a controlled experimental chamber (Operant Box). "
+        f"{goal_sentence or ''}"
+        "You will be presented with a stimulus (SD), and you must respond with a single action. "
+        f"Available actions: {list(actions)!r}. "
+        f"{feedback_sentence or ''}"
+        "Respond ONLY with the action name."
+    )
+
+
+@dataclass(frozen=True)
+class ResultText:
+    """The result line a subject reads after each step.
+
+    ``None`` as a line means no line is sent for that step. ``by_label`` maps a
+    reinforcer label (the string passed to ``learn``) to its own line; other
+    reinforcers get ``reinforced``.
+    """
+
+    reinforced: str | None = "Result: Reward"
+    unreinforced: str | None = "Result: No Reward"
+    by_label: Mapping[str, str | None] = field(default_factory=dict)
+
+    def line(self, sr: Any | None) -> str | None:
+        if not sr:
+            return self.unreinforced
+        if isinstance(sr, str) and sr in self.by_label:
+            return self.by_label[sr]
+        return self.reinforced
+
 
 class LLMSubject(Subject):
     """LLM-driven subject that learns through in-context history.
@@ -51,6 +98,9 @@ class LLMSubject(Subject):
         If true, no trials are shown; instead the system prompt sent with
         each call ends with the counts of reinforcers and Lever Press
         responses so far. ``history_window`` is then ignored.
+    result_text : ResultText or None
+        The result lines of the shown trials. ``None`` means ``ResultText()``.
+        The counts of ``summary_only`` are not affected.
     """
 
     def __init__(
@@ -60,6 +110,7 @@ class LLMSubject(Subject):
         system_prompt: str | None = None,
         history_window: int | None = None,
         summary_only: bool = False,
+        result_text: ResultText | None = None,
     ) -> None:
         if history_window is not None and history_window < 0:
             raise ValueError("history_window must be None or a non-negative integer")
@@ -70,6 +121,7 @@ class LLMSubject(Subject):
         self.system_prompt = system_prompt or SYSTEM_PROMPT
         self.history_window = history_window
         self.summary_only = summary_only
+        self.result_text = result_text or ResultText()
 
     def sense(self, sd: Any) -> None:
         self.current_sd = sd
@@ -115,9 +167,9 @@ class LLMSubject(Subject):
         for h in shown:
             msgs.append({"role": "user", "content": f"Stimulus: {h['sd']}"})
             msgs.append({"role": "assistant", "content": h["r"]})
-            msgs.append(
-                {"role": "user", "content": f"Result: {'Reward' if h['sr'] else 'No Reward'}"}
-            )
+            line = self.result_text.line(h["sr"])
+            if line is not None:
+                msgs.append({"role": "user", "content": line})
         msgs.append({"role": "user", "content": f"Stimulus: {self.current_sd}"})
         return msgs
 
@@ -170,11 +222,23 @@ class StreamingLLMSubject(Subject):
         :class:`ai_operant_box.agent.api_client.ClaudeCLIClient`.
     actions : sequence of str
         Valid action names. Must include ``"Nothing"``.
+    result_text : ResultText or None
+        The result lines. ``None`` means ``ResultText()``.
+    preamble : str or None
+        A line put at the head of the first message only.
     """
 
-    def __init__(self, client: Any, actions: Sequence[str] = ACTIONS) -> None:
+    def __init__(
+        self,
+        client: Any,
+        actions: Sequence[str] = ACTIONS,
+        result_text: ResultText | None = None,
+        preamble: str | None = None,
+    ) -> None:
         self.client = client
         self.actions = tuple(actions)
+        self.result_text = result_text or ResultText()
+        self.preamble = preamble
         self.current_sd: Any | None = None
         self.invalid_count = 0
         self._history: list[dict] = []
@@ -185,8 +249,11 @@ class StreamingLLMSubject(Subject):
     def act(self) -> str:
         lines = []
         if self._history:
-            sr = self._history[-1].get("sr")
-            lines.append(f"Result: {'Reward' if sr else 'No Reward'}")
+            line = self.result_text.line(self._history[-1].get("sr"))
+            if line is not None:
+                lines.append(line)
+        elif self.preamble is not None:
+            lines.append(self.preamble)
         lines.append(f"Stimulus: {self.current_sd}")
         raw = self.client.send("\n".join(lines))
         action = extract_action(raw, self.actions)
@@ -267,8 +334,11 @@ class SelfOptimizingLLMSubject(LLMSubject):
 __all__ = [
     "ACTIONS",
     "LLMSubject",
+    "NEUTRAL_FEEDBACK_SENTENCE",
+    "ResultText",
     "SYSTEM_PROMPT",
     "SelfOptimizingLLMSubject",
     "StreamingLLMSubject",
+    "build_system_prompt",
     "extract_action",
 ]
