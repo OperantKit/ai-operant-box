@@ -16,10 +16,9 @@ lazily and comes with the ``concurrent`` extra.
 
 References
 ----------
-Catania, A. C. (1966). Concurrent performances: Reinforcement
-interaction and response independence. *Journal of the Experimental
-Analysis of Behavior*, 9(3), 253-263.
-https://doi.org/10.1901/jeab.1966.9-253
+Catania, A. C. (1966). Concurrent operants. In W. K. Honig (Ed.),
+*Operant behavior: Areas of research and application*
+(pp. 213-270). Appleton-Century-Crofts.
 
 Herrnstein, R. J. (1961). Relative and absolute strength of response
 as a function of frequency of reinforcement. *Journal of the
