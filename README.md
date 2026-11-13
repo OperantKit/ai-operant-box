@@ -30,7 +30,7 @@ pip install git+https://github.com/OperantKit/contingency-dsl-py \
 
 A Claude model as the subject needs either the `claude` command (Claude Code, logged in) or `pip install anthropic` and `ANTHROPIC_API_KEY`.
 
-## 30-second example
+## Example
 
 Put a numerical subject whose response probability grows with the square of the time since the last reinforcer (`P(R) = min(1, k * t**2)`) on a fixed-interval 30-s schedule for 600 one-second steps. No LLM and no API key are needed:
 
@@ -103,7 +103,7 @@ G=git+https://github.com/OperantKit
 .venv/bin/python -m pytest
 ```
 
-The anthropic SDK and the `claude` command are not needed for the tests; the one test that loads a local model is skipped unless `llama-cpp-python` is installed and `AOB_GGUF` names a GGUF file. `tests/test_readme_examples.py` runs the 30-second example in both READMEs and checks the printed lines.
+The anthropic SDK and the `claude` command are not needed for the tests; the one test that loads a local model is skipped unless `llama-cpp-python` is installed and `AOB_GGUF` names a GGUF file. `tests/test_readme_examples.py` runs the example in both READMEs and checks the printed lines.
 
 ## References
 

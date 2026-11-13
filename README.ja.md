@@ -30,7 +30,7 @@ pip install git+https://github.com/OperantKit/contingency-dsl-py \
 
 Claude のモデルを被験体にするには、`claude` コマンド（ログイン済みの Claude Code）か、`pip install anthropic` と `ANTHROPIC_API_KEY` のどちらかが要ります。
 
-## 30 秒で動く例
+## 例
 
 前の強化子からの経過時間の 2 乗で反応確率が増える数値の被験体（`P(R) = min(1, k * t**2)`）を、固定間隔 30 秒のスケジュールで 1 秒のステップ 600 回走らせます。LLM も API キーも要りません。
 
@@ -103,7 +103,7 @@ G=git+https://github.com/OperantKit
 .venv/bin/python -m pytest
 ```
 
-テストに anthropic SDK と `claude` コマンドは要りません。手元のモデルを読み込むテスト 1 つだけは、`llama-cpp-python` が入っていて `AOB_GGUF` が GGUF ファイルを指すとき以外はスキップされます。`tests/test_readme_examples.py` は両方の README の「30 秒で動く例」を走らせ、出力された行を照合します。
+テストに anthropic SDK と `claude` コマンドは要りません。手元のモデルを読み込むテスト 1 つだけは、`llama-cpp-python` が入っていて `AOB_GGUF` が GGUF ファイルを指すとき以外はスキップされます。`tests/test_readme_examples.py` は両方の README の「例」を走らせ、出力された行を照合します。
 
 ## 参考文献
 

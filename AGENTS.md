@@ -48,4 +48,4 @@ A short loop that asks a model "press or not" and counts presses leaves out what
 
 - Python 3.11+. Create the environment with `python -m venv .venv` and install as in the README's Development section (`pip install --no-deps -e .` plus the OperantKit libraries from GitHub, then the third-party test tools; the `[dev]` extra does not resolve until those libraries are released). Run `.venv/bin/python -m pytest`.
 - `README.md` (English) is canonical; keep `README.ja.md` in sync in the same commit.
-- The 30-second example in both READMEs is executed by `tests/test_readme_examples.py`, which checks the printed lines written in the README.
+- The example in both READMEs is executed by `tests/test_readme_examples.py`, which checks the printed lines written in the README.

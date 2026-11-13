@@ -1,4 +1,4 @@
-"""Run the 30-second example in each README and check the output it documents."""
+"""Run the example in each README and check the output it documents."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-READMES = {"README.md": "## 30-second example", "README.ja.md": "## 30 秒で動く例"}
+READMES = {"README.md": "## Example", "README.ja.md": "## 例"}
 _PYTHON = re.compile(r"```python\n(.*?)```", re.DOTALL)
 
 
@@ -34,7 +34,7 @@ def _documented_output(code: str) -> list[str]:
 
 @pytest.mark.integration
 @pytest.mark.parametrize("name", list(READMES))
-def test_readme_30_second_example(name: str) -> None:
+def test_readme_example(name: str) -> None:
     code = _example(name)
     expected = _documented_output(code)
     assert len(expected) == 2
