@@ -115,3 +115,36 @@ def test_anthropic_client_lazy_import_skipped_when_missing():
         finally:
             if old is not None:
                 os.environ["ANTHROPIC_API_KEY"] = old
+
+
+def _run_smoke(*extra: str) -> str:
+    result = subprocess.run(
+        [sys.executable, "-m", "ai_operant_box.cli", "smoke", *extra],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout
+
+
+def test_cli_smoke_is_deterministic():
+    """`smoke` is documented as deterministic: two runs print the same line."""
+    first = _run_smoke()
+    second = _run_smoke()
+    assert first == second
+
+
+def test_cli_smoke_seed_option_is_deterministic():
+    assert _run_smoke("--seed", "7") == _run_smoke("--seed", "7")
+
+
+def test_cli_smoke_does_not_touch_module_random_state():
+    import random
+
+    from ai_operant_box.cli import main
+
+    random.seed(123)
+    expected = [random.random() for _ in range(3)]
+    random.seed(123)
+    assert main(["smoke"]) == 0
+    assert [random.random() for _ in range(3)] == expected

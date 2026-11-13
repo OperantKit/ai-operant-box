@@ -2,6 +2,9 @@
 
 Currently exposes only ``--version`` and a ``smoke`` subcommand that runs a
 short deterministic scallop-agent session and prints the response count.
+The session draws from its own ``random.Random(seed)`` (``--seed``, default
+0), so the same arguments print the same line and the module-level
+:mod:`random` state is left untouched.
 Real LLM-driven runs will be added once the schedule integration with
 ``contingency-py`` lands.
 """
@@ -9,6 +12,7 @@ Real LLM-driven runs will be added once the schedule integration with
 from __future__ import annotations
 
 import argparse
+import random
 import sys
 from collections.abc import Sequence
 
@@ -34,6 +38,9 @@ def _build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--duration", type=float, default=60.0, help="Session duration (s).")
     smoke.add_argument("--delta", type=float, default=1.0, help="Step size (s).")
     smoke.add_argument("--k", type=float, default=0.005, help="Scallop coefficient.")
+    smoke.add_argument(
+        "--seed", type=int, default=0, help="Seed for the agent's random number generator."
+    )
 
     return parser
 
@@ -58,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "smoke":
         clock = VirtualClock()
         schedule = FixedInterval(interval=args.interval)
-        agent = ScallopingAgent(k=args.k)
+        agent = ScallopingAgent(k=args.k, rng=random.Random(args.seed))
         box = OperantBox(subject=agent, schedule=schedule, clock=clock)
 
         steps = int(args.duration / args.delta)

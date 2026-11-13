@@ -21,10 +21,16 @@ class ScallopingAgent(Subject):
 
     where ``t`` is the time since the most recent reinforcer (advanced
     externally via :meth:`update_time`).
+
+    ``rng`` is the random number generator the agent draws from. When it is
+    ``None`` the agent uses the module-level :mod:`random` functions, so
+    ``random.seed(...)`` controls it; pass ``random.Random(seed)`` to get a
+    reproducible stream without touching the module-level state.
     """
 
-    def __init__(self, k: float = 0.0001) -> None:
+    def __init__(self, k: float = 0.0001, rng: random.Random | None = None) -> None:
         self.k = k
+        self._rng = rng
         self.time_since_last_sr: float = 0.0
         self.current_time: float = 0.0
         self._history: list[dict] = []
@@ -35,7 +41,8 @@ class ScallopingAgent(Subject):
 
     def act(self) -> str | None:
         prob = min(1.0, self.k * (self.time_since_last_sr ** 2))
-        if random.random() < prob:
+        draw = self._rng.random() if self._rng is not None else random.random()
+        if draw < prob:
             return "Lever Press"
         return None
 

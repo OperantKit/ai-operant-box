@@ -86,7 +86,7 @@ How to run an LLM as the subject, with measured time per step: [docs/en/llm-subj
 - **Variable schedules are not Fleshler–Hoffman.** VI, VR, RI, and RR values in the single-lever chamber are independent draws from an exponential distribution, rounded to whole numbers. Only the two-lever chamber uses contingency-py's schedules.
 - **The subjects are models, not organisms.** The numerical agents exist to check the chamber and the measures. `LLMSubject` takes the model's whole reply as the action, so only a reply that is exactly an action name counts; `StreamingLLMSubject` looks for an action name in the reply and records a reply that names no single action as "Nothing".
 - **Hosted LLM subjects are Claude models** (the Anthropic API or the `claude` command). Other models need your own client.
-- **The `ai-operant-box` command only runs a short smoke test** (`ai-operant-box smoke`); experiments are run from Python or the scripts in `examples/`.
+- **The `ai-operant-box` command only runs a short smoke test** (`ai-operant-box smoke`, which prints the same line on every run for the same arguments; `--seed` picks another stream); experiments are run from Python or the scripts in `examples/`.
 
 ## For AI coding agents
 
