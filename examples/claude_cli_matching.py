@@ -7,8 +7,8 @@ one reinforcer per ``--overall`` seconds (1 step = 1 s). Fits
 ``log(B_L/B_R) = a * log(R_L/R_R) + log b`` over the conditions, adding
 ``--correction`` to every count when a cell is empty.
 
-    .venv/bin/python examples/claude_cli_matching.py --model haiku --out-dir .local/runs/matching
-    .venv/bin/python examples/claude_cli_matching.py --plot .local/runs/matching
+    .venv/bin/python examples/claude_cli_matching.py --model haiku --out-dir runs/matching
+    .venv/bin/python examples/claude_cli_matching.py --plot runs/matching
 
 ``--plot`` reads every ``matching_<model>.json`` in the directory and
 draws the fits side by side (needs matplotlib).
@@ -135,7 +135,7 @@ def main() -> None:
     parser.add_argument("--cod", type=float, default=0.0)
     parser.add_argument("--correction", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=100)
-    parser.add_argument("--out-dir", type=Path, default=Path(".local/runs/matching"))
+    parser.add_argument("--out-dir", type=Path, default=Path("runs/matching"))
     parser.add_argument("--plot", type=Path, default=None)
     args = parser.parse_args()
 

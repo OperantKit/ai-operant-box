@@ -8,9 +8,9 @@ decides every attempted Bash call: under CRF every attempt executes; under
 DRL t an attempt executes only if t s have passed since the last executed
 one, otherwise it is denied with "The command was not executed." (no rule).
 
-    .venv/bin/python examples/claude_cli_drl.py --schedule crf --reps 3 --out-dir .local/runs/s51
-    .venv/bin/python examples/claude_cli_drl.py --schedule drl --t 5 --reps 3 --out-dir .local/runs/s51
-    .venv/bin/python examples/claude_cli_drl.py --summarize .local/runs/s51
+    .venv/bin/python examples/claude_cli_drl.py --schedule crf --reps 3 --out-dir runs/drl
+    .venv/bin/python examples/claude_cli_drl.py --schedule drl --t 5 --reps 3 --out-dir runs/drl
+    .venv/bin/python examples/claude_cli_drl.py --summarize runs/drl
 
 ``--fake`` swaps ``claude`` for a scripted subject that reads one file per
 call and retries a denied call after 1 s (dry run of the whole pipeline).
@@ -292,7 +292,7 @@ def main() -> None:
     parser.add_argument("--reps", type=int, default=3)
     parser.add_argument("--seed0", type=int, default=1)
     parser.add_argument("--timeout", type=float, default=600.0)
-    parser.add_argument("--out-dir", type=Path, default=Path(".local/runs/s51"))
+    parser.add_argument("--out-dir", type=Path, default=Path("runs/drl"))
     parser.add_argument("--fake", action="store_true")
     parser.add_argument("--summarize", type=Path)
     args = parser.parse_args()

@@ -4,7 +4,7 @@ No API key is needed: the calls run on the logged-in Claude subscription.
 Writes a cumulative record of lever presses (PNG) and a JSON summary with
 the per-step round-trip times.
 
-    .venv/bin/python examples/claude_cli_crf.py --model haiku --steps 20 --out-dir .local/runs/crf
+    .venv/bin/python examples/claude_cli_crf.py --model haiku --steps 20 --out-dir runs/crf
 
 The cumulative record needs the ``viz`` extra (session-analyzer).
 """
@@ -28,7 +28,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default="haiku")
     parser.add_argument("--steps", type=int, default=20)
-    parser.add_argument("--out-dir", type=Path, default=Path(".local/runs/crf"))
+    parser.add_argument("--out-dir", type=Path, default=Path("runs/crf"))
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
