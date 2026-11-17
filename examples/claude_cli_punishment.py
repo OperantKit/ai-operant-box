@@ -73,26 +73,6 @@ def punishment_system_prompt(reinforcer_points: int = 100) -> str:
             f"{SHOCK_SENTENCE}")
 
 
-class _Magnitude:
-    """Wrap a schedule and replace the magnitude of its reinforcer (FR has none)."""
-
-    def __init__(self, inner: Any, magnitude: float) -> None:
-        self._inner = inner
-        self._magnitude = float(magnitude)
-
-    def step(self, now: float, event: Any = None) -> Any:
-        from dataclasses import replace
-
-        outcome = self._inner.step(now, event)
-        if outcome.reinforced and outcome.reinforcer is not None:
-            return replace(outcome, reinforcer=replace(outcome.reinforcer,
-                                                       magnitude=self._magnitude))
-        return outcome
-
-    def reset(self) -> None:
-        self._inner.reset()
-
-
 class _Shifted:
     """Present phase-local time ``now - offset`` to a schedule started mid-session.
 
@@ -115,15 +95,19 @@ class _Shifted:
         self._inner.reset()
 
 
-def build_phase_schedule(phase: str, vi: float, seed: int, punishment: float,
-                         offset: float) -> Any:
-    """Schedule of one phase; ``punishment`` is the punisher magnitude in reinforcer units."""
+def build_phase_schedule(phase: str, vi: float, seed: int, offset: float) -> Any:
+    """Schedule of one phase.
+
+    Every punisher of the punishment phase has contingency-py's default
+    magnitude 1; :class:`PunishmentPointSubject` turns one punisher into
+    ``punishment_points`` points.
+    """
     from contingency.schedules import FR, VI, Overlay
 
     if phase == "baseline":
         schedule: Any = VI(vi, seed=seed)
     elif phase == "punishment":
-        schedule = Overlay(VI(vi, seed=seed + 1), _Magnitude(FR(1), punishment))
+        schedule = Overlay(VI(vi, seed=seed + 1), FR(1))
     elif phase == "recovery":
         schedule = VI(vi, seed=seed + 2)
     else:
@@ -135,17 +119,21 @@ class PunishmentPointSubject(StreamingLLMSubject):
     """Streaming subject whose result lines report rewards, shocks and points.
 
     A reinforcer adds ``reinforcer_points``; :meth:`punish` (called by
-    :class:`OperantBox` with the punisher magnitude in reinforcer units)
-    subtracts ``round(amount * reinforcer_points)`` points. Each history
+    :class:`OperantBox` with the punisher magnitude, 1 per punisher of
+    ``Overlay(VI, FR 1)``) subtracts ``round(amount * punishment_points)`` points. Each history
     entry gets ``"shock"`` (points lost, 0 if none) and ``"points"``.
     """
 
     def __init__(self, client: Any, reinforcer_points: int = 100,
+                 punishment_points: int = 1,
                  actions: Sequence[str] = ACTIONS) -> None:
         if reinforcer_points <= 0:
             raise ValueError("reinforcer_points must be positive")
+        if punishment_points <= 0:
+            raise ValueError("punishment_points must be positive")
         super().__init__(client, actions)
         self.reinforcer_points = reinforcer_points
+        self.punishment_points = punishment_points
         self.points = 0
 
     def act(self) -> str:
@@ -180,7 +168,7 @@ class PunishmentPointSubject(StreamingLLMSubject):
             self._history[-1]["points"] = self.points
 
     def punish(self, amount: float) -> None:
-        lost = round(amount * self.reinforcer_points)
+        lost = round(amount * self.punishment_points)
         self.points -= lost
         if self._history:
             self._history[-1]["shock"] += lost
@@ -264,14 +252,14 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     stem = f"punish_vi{args.vi:g}_p{args.punishment_points}_{args.model}_seed{args.seed}"
     system_prompt = punishment_system_prompt(args.reinforcer_points)
-    punishment = args.punishment_points / args.reinforcer_points
 
     started = time.monotonic()
     with ClaudeCLIClient(model=args.model, system_prompt=system_prompt) as client:
-        subject = PunishmentPointSubject(client, args.reinforcer_points)
+        subject = PunishmentPointSubject(client, args.reinforcer_points,
+                                         args.punishment_points)
         box = OperantBox(subject=subject, schedule=None)
         for k, phase in enumerate(PHASES):
-            box.schedule = build_phase_schedule(phase, args.vi, args.seed, punishment,
+            box.schedule = build_phase_schedule(phase, args.vi, args.seed,
                                                 offset=float(k * args.phase_steps))
             for _ in range(args.phase_steps):
                 box.step(1.0)

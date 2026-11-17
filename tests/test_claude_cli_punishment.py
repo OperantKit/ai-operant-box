@@ -36,12 +36,13 @@ class ScriptedClient:
         return self.replies.pop(0)
 
 
-def _run(replies: list[str], phase_steps: int = 4, vi: float = 2.0):
+def _run(replies: list[str], phase_steps: int = 4, vi: float = 2.0,
+         punishment_points: int = 1):
     client = ScriptedClient(replies)
-    subject = ex.PunishmentPointSubject(client)
+    subject = ex.PunishmentPointSubject(client, punishment_points=punishment_points)
     box = OperantBox(subject=subject, schedule=None)
     for k, phase in enumerate(ex.PHASES):
-        box.schedule = ex.build_phase_schedule(phase, vi, 0, 0.01, offset=float(k * phase_steps))
+        box.schedule = ex.build_phase_schedule(phase, vi, 0, offset=float(k * phase_steps))
         for _ in range(phase_steps):
             box.step(1.0)
     return client, subject, box
@@ -65,6 +66,20 @@ def test_every_press_in_punishment_phase_costs_one_point_and_is_reported() -> No
     assert not any("Shock" in line for line in lines[:4] + lines[8:])
     n_sr = sum(r.is_reinforced for r in box.records)
     assert subject.points == 100 * n_sr - 4
+
+
+def test_punishment_points_set_the_cost_of_one_shock() -> None:
+    client, subject, box = _run(["Lever Press"] * 12, punishment_points=5)
+    lines = [t.splitlines()[0] for t in client.sent[1:]]
+    for line in lines[4:8]:
+        assert "Shock (-5 points)." in line
+    n_sr = sum(r.is_reinforced for r in box.records)
+    assert subject.points == 100 * n_sr - 20
+
+
+def test_punishment_phase_runs_on_the_rust_engine() -> None:
+    schedule = ex.build_phase_schedule("punishment", 2.0, 0, offset=0.0)
+    assert schedule._inner.engine == "rust"
 
 
 def test_compound_step_reports_reward_and_shock() -> None:
